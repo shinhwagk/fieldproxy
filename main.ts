@@ -66,12 +66,12 @@ interface ConsulService {
     ServicePort: number
 }
 
-async function proxy(mdoAddr: string, body: string) {
+async function MODClient(mdoAddr: string, body: string) {
     return await fetch(`http://${mdoAddr}/query`, {
         method: "POST",
         headers: { 'content-type': 'application/json' },
         body: body
-    }).then(res => res.body)
+    }).then(res => res.json())
 }
 
 class MODProxy {
@@ -84,8 +84,9 @@ class MODProxy {
                 const dbId = request.headers.get('multidatabase-dbid')
                 if (dbId) {
                     const modAddr = this.lb.getServiceAddr(dbId)
-                    const body = await proxy(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
-                    request.respond({ status: 200, body: readerFromStreamReader(body!.getReader()), headers: request.headers });
+                    const body = await MODClient(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
+                    console.log(body)
+                    request.respond({ status: 200, body: body });
                 } else {
                     request.respond({ status: 200, body: "db id not exist" });
                 }
