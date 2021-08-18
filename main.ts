@@ -45,7 +45,7 @@ class LoadBalancer {
     getServiceAddr(dbId: string): string {
         // is exist
         for (const i of Object.keys(this.container)) {
-            if (dbId in this.container[i]) {
+            if (this.container[i].includes(dbId)) {
                 return i
             }
         }
