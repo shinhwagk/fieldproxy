@@ -6,9 +6,24 @@ class LoadBalancer {
     private container: { [ca: string]: string[] } = {}
     private containerAverage = 0
     private services: string[] = []
+    private activeDbs: { [db: string]: number } = {}
 
     constructor() {
-        setInterval(() => { this.refreshService(); this.refreshContainer(); this.refreshContainerAverage() }, 5000)
+        setInterval(() => { this.refreshService(); this.refreshContainer(); this.refreshContainerAverage(); this.cleanUnusedDbId() }, 5000)
+    }
+
+    private cleanUnusedDbId() {
+        for (const i of Object.keys(this.container)) {
+            for (const dbId of this.container[i]) {
+                if ((new Date()).getTime() - this.activeDbs[dbId] > 1000 * 60) {
+                    delete this.activeDbs[dbId]
+                    const index = this.container[i].indexOf(dbId);
+                    if (index > -1) {
+                        this.container[i].splice(index, 1);
+                    }
+                }
+            }
+        }
     }
 
     private async refreshService() {
@@ -43,6 +58,7 @@ class LoadBalancer {
     }
 
     getServiceAddr(dbId: string): string {
+        this.activeDbs[dbId] = (new Date()).getTime()
         // is exist
         for (const i of Object.keys(this.container)) {
             if (this.container[i].includes(dbId)) {
