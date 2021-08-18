@@ -1,0 +1,11 @@
+GET http://dbmonitor.weihui.com:3000/v1/catalog/service/multidatabasece-oracle HTTP/1.1
+
+###
+POST http://127.0.0.1:8080/query HTTP/1.1
+multidatabase-dbid: t11
+
+{
+    "db_id":"t11",
+    "sql_text":"SELECT * FROM v$sql_shared_cursor WHERE sql_id=:1 AND child_number=:2",
+    "binds":["716xhkhzwn12h",0]
+}
