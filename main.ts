@@ -52,6 +52,7 @@ class LoadBalancer {
         for (const i of Object.keys(this.container)) {
             if (this.container[i].length < this.containerAverage) {
                 this.container[i].push(dbId)
+                console.log(this.container)
                 return i
             }
         }
