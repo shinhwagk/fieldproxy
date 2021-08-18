@@ -1,5 +1,6 @@
 import { readAll } from "https://deno.land/std/io/util.ts"
 import { serve } from "https://deno.land/std@0.103.0/http/server.ts";
+import { readerFromStreamReader } from "https://deno.land/std/io/mod.ts";
 
 class LoadBalancer {
     private container: { [ca: string]: string[] } = {}
@@ -50,7 +51,7 @@ class LoadBalancer {
         }
         // if not exist
         for (const i of Object.keys(this.container)) {
-            if (this.container[i].length < this.containerAverage) {
+            if (this.container[i].length <= this.containerAverage) {
                 this.container[i].push(dbId)
                 console.log(this.container)
                 return i
@@ -65,7 +66,6 @@ interface ConsulService {
     ServiceAddress: string
     ServicePort: number
 }
-import { readableStreamFromReader, readerFromStreamReader } from "https://deno.land/std/io/mod.ts";
 
 async function MODClient(mdoAddr: string, body: string) {
     const res = await fetch(`http://${mdoAddr}/query`, {
