@@ -1,35 +1,34 @@
 import { readAll } from "https://deno.land/std/io/util.ts"
 import { serve } from "https://deno.land/std@0.103.0/http/server.ts";
-import { readerFromStreamReader, } from "https://deno.land/std@0.105.0/io/mod.ts";
 
 class LoadBalancer {
-    container: { [ca: string]: string[] } = {}
-    containerAverage = 0
-    services: string[] = []
+    private container: { [ca: string]: string[] } = {}
+    private containerAverage = 0
+    private services: string[] = []
 
     constructor() {
         setInterval(() => { this.refreshService(); this.refreshContainer(); this.refreshContainerAverage() }, 5000)
     }
 
-    async refreshService() {
+    private async refreshService() {
         console.log("refreshService")
         console.log(this.container, this.containerAverage, this.services)
         this.services = await this.getServices()
     }
 
-    refreshContainerAverage() {
+    private refreshContainerAverage() {
         const cLen = Object.keys(this.container).length
         this.containerAverage = cLen === 0 ? 0 : Object.values(this.container).map(ds => ds.length).reduce((a, b) => a + b, 0) / cLen
     }
 
-    async getServices(): Promise<string[]> {
+    private async getServices(): Promise<string[]> {
         const consulAddr = Deno.env.get('CONSUL_ADDR')
         const consulService = Deno.env.get('CONSUL_SERVICE')
         const services = await fetch(`http://${consulAddr}/v1/catalog/service/${consulService}`).then(res => res.json())
         return services.map((s: ConsulService) => `${s.ServiceAddress}:${s.ServicePort}`)
     }
 
-    refreshContainer() {
+    private refreshContainer() {
         for (const s of Object.keys(this.container)) {
             if (!this.services.includes(s)) {
                 delete this.container[s]
@@ -82,8 +81,10 @@ class MODProxy {
         for await (const request of server) {
             try {
                 const dbId = request.headers.get('multidatabase-dbid')
+                console.log(dbId)
                 if (dbId) {
                     const modAddr = this.lb.getServiceAddr(dbId)
+                    console.log(modAddr)
                     const body = await MODClient(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
                     console.log(body)
                     request.respond({ status: 200, body: body });
