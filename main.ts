@@ -64,13 +64,15 @@ interface ConsulService {
     ServiceAddress: string
     ServicePort: number
 }
+import { readableStreamFromReader, readerFromStreamReader } from "https://deno.land/std/io/mod.ts";
 
 async function MODClient(mdoAddr: string, body: string) {
-    return await fetch(`http://${mdoAddr}/query`, {
+    const res = await fetch(`http://${mdoAddr}/query`, {
         method: "POST",
         headers: { 'content-type': 'application/json' },
         body: body
-    }).then(res => res.json())
+    })
+    return { headers: res.headers, body: res.body }
 }
 
 class MODProxy {
@@ -85,9 +87,9 @@ class MODProxy {
                 if (dbId) {
                     const modAddr = this.lb.getServiceAddr(dbId)
                     console.log(modAddr)
-                    const body = await MODClient(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
+                    const { headers, body } = await MODClient(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
                     console.log(body)
-                    request.respond({ status: 200, body: body });
+                    request.respond({ status: 200, body: readerFromStreamReader(body!.getReader()), headers });
                 } else {
                     request.respond({ status: 200, body: "db id not exist" });
                 }
