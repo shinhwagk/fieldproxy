@@ -57,7 +57,7 @@ class LoadBalancer {
         }
     }
 
-    getServiceAddr(dbId: string): string {
+    getServiceAddr(dbId: string): string | null {
         this.activeDbs[dbId] = (new Date()).getTime()
         // is exist
         for (const i of Object.keys(this.container)) {
@@ -73,7 +73,7 @@ class LoadBalancer {
                 return i
             }
         }
-        return Object.keys(this.container)[0]
+        return Object.keys(this.container).length >= 1 ? Object.keys(this.container)[0] : null;
     }
 
 }
@@ -104,9 +104,13 @@ class MODProxy {
                 if (dbId) {
                     const modAddr = this.lb.getServiceAddr(dbId)
                     console.log(modAddr)
-                    const { headers, body } = await MODClient(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
-                    console.log(body)
-                    request.respond({ status: 200, body: readerFromStreamReader(body!.getReader()), headers });
+                    if (modAddr) {
+                        const { headers, body } = await MODClient(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
+                        console.log(body)
+                        request.respond({ status: 200, body: readerFromStreamReader(body!.getReader()), headers });
+                    } else {
+                        request.respond({ status: 200, body: "db id not exist" });
+                    }
                 } else {
                     request.respond({ status: 200, body: "db id not exist" });
                 }
