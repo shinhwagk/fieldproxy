@@ -12,10 +12,11 @@ interface Conf {
 type LastUsedTime = number
 
 class Configure {
+    f = "/etc/fieldproxy/fieldproxy.yml"
     c: Conf
     constructor() {
-        this.c = parse(Deno.readTextFileSync('conf.yml')) as Conf
-        setInterval(() => this.c = parse(Deno.readTextFileSync('conf.yml')) as Conf, 5000)
+        this.c = parse(Deno.readTextFileSync(this.f)) as Conf
+        setInterval(() => this.c = parse(Deno.readTextFileSync(this.f)) as Conf, 5000)
     }
 }
 
@@ -87,7 +88,7 @@ async function httpClient(server: string, url: string, method: string, headers: 
     return { status: res.status, headers: res.headers, body: res.body }
 }
 
-class HeaderFieldProxy {
+class FieldProxy {
     private readonly c = new Configure()
     private readonly lb = new LoadBalancer(this.c)
     async start(port: number) {
@@ -103,8 +104,11 @@ class HeaderFieldProxy {
                     console.log(server)
                     if (server) {
                         const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, (new TextDecoder()).decode(await readAll(request.body)))
-                        console.log(body)
-                        request.respond({ status: status, body: readerFromStreamReader(body!.getReader()), headers });
+                        if (body) {
+                            request.respond({ status: status, body: readerFromStreamReader(body.getReader()), headers });
+                        } else {
+                            request.respond({ status: status, headers });
+                        }
                     } else {
                         request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
                     }
@@ -119,5 +123,4 @@ class HeaderFieldProxy {
     }
 }
 
-const _port = Deno.env.get('HFP_PORT');
-(new HeaderFieldProxy).start(_port ? Number(_port) : 8000)
+(new FieldProxy).start(Number(Deno.env.get('FP_PORT') || "8000"))
