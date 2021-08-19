@@ -27,5 +27,5 @@ jobs:
         with:
           push: true
           tags: |
-            shinhwagk/multidatabase-proxy:${{ steps.version.outputs.version }}
-            shinhwagk/multidatabase-proxy:latest
+            shinhwagk/fieldproxy:${{ steps.version.outputs.version }}
+            shinhwagk/fieldproxy:latest

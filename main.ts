@@ -1,124 +1,123 @@
 import { readAll } from "https://deno.land/std/io/util.ts"
 import { serve } from "https://deno.land/std@0.103.0/http/server.ts";
 import { readerFromStreamReader } from "https://deno.land/std/io/mod.ts";
+import { parse } from "https://deno.land/std@0.103.0/encoding/yaml.ts";
+
+interface Conf {
+    field: string;
+    upstream: string[];
+    outtime: number; // default second
+}
+
+type LastUsedTime = number
+
+class Configure {
+    c: Conf
+    constructor() {
+        this.c = parse(Deno.readTextFileSync('conf.yml')) as Conf
+        setInterval(() => this.c = parse(Deno.readTextFileSync('conf.yml')) as Conf, 5000)
+    }
+}
 
 class LoadBalancer {
-    private container: { [ca: string]: string[] } = {}
-    private containerAverage = 0
-    private services: string[] = []
-    private activeDbs: { [db: string]: number } = {}
+    private container: { [server: string]: { [field: string]: LastUsedTime } } = {}
 
-    constructor() {
-        setInterval(() => { this.refreshService(); this.refreshContainer(); this.refreshContainerAverage(); this.cleanUnusedDbId() }, 5000)
+    constructor(private readonly c: Configure) {
+        setInterval(() => { this.refreshContainer(); this.cleanUnusedField() }, 5000)
     }
 
-    private cleanUnusedDbId() {
+    private cleanUnusedField() {
         for (const i of Object.keys(this.container)) {
-            for (const dbId of this.container[i]) {
-                if ((new Date()).getTime() - this.activeDbs[dbId] > 1000 * 60) {
-                    delete this.activeDbs[dbId]
-                    const index = this.container[i].indexOf(dbId);
-                    if (index > -1) {
-                        this.container[i].splice(index, 1);
-                    }
+            for (const [field, ltime] of Object.entries(this.container[i])) {
+                if ((new Date()).getTime() - ltime > 1000 * this.c.c.outtime) {
+                    delete this.container[i][field]
                 }
             }
         }
     }
 
-    private async refreshService() {
-        console.log("refreshService")
-        console.log(this.container, this.containerAverage, this.services)
-        this.services = await this.getServices()
-    }
-
-    private refreshContainerAverage() {
+    private getContainerFieldsAverage() {
         const cLen = Object.keys(this.container).length
-        this.containerAverage = cLen === 0 ? 0 : Object.values(this.container).map(ds => ds.length).reduce((a, b) => a + b, 0) / cLen
-    }
-
-    private async getServices(): Promise<string[]> {
-        const consulAddr = Deno.env.get('CONSUL_ADDR')
-        const consulService = Deno.env.get('CONSUL_SERVICE')
-        const services = await fetch(`http://${consulAddr}/v1/catalog/service/${consulService}`).then(res => res.json())
-        return services.map((s: ConsulService) => `${s.ServiceAddress}:${s.ServicePort}`)
+        const avg = cLen === 0 ? 0 : Object.values(this.container).map(s => Object.keys(s).length).reduce((a, b) => a + b, 0) / cLen
+        return Math.floor(avg)
     }
 
     private refreshContainer() {
+        const servers: string[] = this.c.c.upstream
         for (const s of Object.keys(this.container)) {
-            if (!this.services.includes(s)) {
+            if (!servers.includes(s)) {
                 delete this.container[s]
             }
         }
-        for (const s of this.services) {
+        for (const s of servers) {
             if (!Object.keys(this.container).includes(s)) {
-                this.container[s] = []
+                this.container[s] = {}
             }
         }
+        console.log(this.container, this.getContainerFieldsAverage())
     }
 
-    getServiceAddr(dbId: string): string | null {
-        this.activeDbs[dbId] = (new Date()).getTime()
+    getServerAddr(field: string): string | null {
         // is exist
         for (const i of Object.keys(this.container)) {
-            if (this.container[i].includes(dbId)) {
+            if (Object.keys(this.container[i]).includes(field)) {
+                this.container[i][field] = (new Date()).getTime()
                 return i
             }
         }
         // if not exist
         for (const i of Object.keys(this.container)) {
-            if (this.container[i].length <= this.containerAverage) {
-                this.container[i].push(dbId)
-                console.log(this.container)
+            if (Object.keys(this.container[i]).length <= this.getContainerFieldsAverage()) {
+                this.container[i][field] = (new Date()).getTime()
                 return i
             }
         }
+
         return Object.keys(this.container).length >= 1 ? Object.keys(this.container)[0] : null;
     }
 
 }
 
-interface ConsulService {
-    ServiceAddress: string
-    ServicePort: number
-}
-
-async function MODClient(mdoAddr: string, body: string) {
-    const res = await fetch(`http://${mdoAddr}/query`, {
-        method: "POST",
-        headers: { 'content-type': 'application/json' },
+async function httpClient(server: string, url: string, method: string, headers: Headers, body: string) {
+    const res = await fetch(`http://${server}${url}`, {
+        method: method,
+        headers: headers,
         body: body
     })
-    return { headers: res.headers, body: res.body }
+    return { status: res.status, headers: res.headers, body: res.body }
 }
 
-class MODProxy {
-    private lb = new LoadBalancer()
-    async start() {
-        const server = serve({ port: 8080 });
+class HeaderFieldProxy {
+    private readonly c = new Configure()
+    private readonly lb = new LoadBalancer(this.c)
+    async start(port: number) {
+        console.log(this.c.c.upstream)
+        const server = serve({ port });
         console.log(`HTTP webserver running.  Access it at:  http://localhost:8080/`);
         for await (const request of server) {
             try {
-                const dbId = request.headers.get('multidatabase-dbid')
-                console.log(dbId)
-                if (dbId) {
-                    const modAddr = this.lb.getServiceAddr(dbId)
-                    console.log(modAddr)
-                    if (modAddr) {
-                        const { headers, body } = await MODClient(modAddr, (new TextDecoder()).decode(await readAll(request.body)))
+                const fieldVal = request.headers.get(this.c.c.field)
+                console.log(`header: ${this.c.c.field}:${fieldVal}`)
+                if (fieldVal) {
+                    const server = this.lb.getServerAddr(fieldVal)
+                    console.log(server)
+                    if (server) {
+                        const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, (new TextDecoder()).decode(await readAll(request.body)))
                         console.log(body)
-                        request.respond({ status: 200, body: readerFromStreamReader(body!.getReader()), headers });
+                        request.respond({ status: status, body: readerFromStreamReader(body!.getReader()), headers });
                     } else {
-                        request.respond({ status: 200, body: "db id not exist" });
+                        request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
                     }
                 } else {
-                    request.respond({ status: 200, body: "db id not exist" });
+                    request.respond({ status: 200, body: `filde: ${fieldVal} not null` });
                 }
             } catch (e) {
-                console.log(e)
+                console.error(e)
+                request.respond({ status: 500, body: e.message });
             }
         }
     }
 }
 
-(new MODProxy).start()
+const _port = Deno.env.get('HFP_PORT');
+(new HeaderFieldProxy).start(_port ? Number(_port) : 8000)
