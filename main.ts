@@ -1,6 +1,7 @@
 import { serve, ServerRequest } from "https://deno.land/std@0.103.0/http/server.ts";
 import { readerFromStreamReader, readableStreamFromReader } from "https://deno.land/std/io/mod.ts";
 import { parse } from "https://deno.land/std@0.103.0/encoding/yaml.ts";
+import * as log from "https://deno.land/std@$0.103.0/log/mod.ts";
 
 interface Conf {
     field: string;
@@ -77,11 +78,10 @@ class LoadBalancer {
 
         return Object.keys(this.container).length >= 1 ? Object.keys(this.container)[0] : null;
     }
-
 }
 
-async function httpClient(server: string, url: string, method: string, headers: Headers, body: BodyInit | null) {
-    const res = await fetch(`http://${server}${url}`, {
+async function httpClient(proxyUrl: string, method: string, headers: Headers, body: BodyInit | null) {
+    const res = await fetch(proxyUrl, {
         method: method,
         headers: headers,
         body: body
@@ -94,20 +94,24 @@ class FieldProxy {
     private readonly c = new Configure()
     private readonly lb = new LoadBalancer(this.c)
 
-    async proxy(request: ServerRequest) {
-        const _start_time = (new Date()).getTime()
+    async proxy(request: ServerRequest, proxyUrl: string) {
+        const { status, headers, body } = await httpClient(proxyUrl, request.method, request.headers, readableStreamFromReader(request.body))
+        const _body = body ? readerFromStreamReader(body.getReader()) : undefined
+        await request.respond({ status: status, headers, body: _body });
+    }
+
+    async fieldProxy(request: ServerRequest) {
+
         const fieldVal = request.headers.get(this.c.c.field)
         console.log(`header: ${this.c.c.field}:${fieldVal}`)
-        console.log(`debug: ${request.headers.values()}`)
         if (fieldVal) {
             const server = this.lb.getServerAddr(fieldVal)
-            console.log(server)
             if (server) {
-                const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, readableStreamFromReader(request.body))
-                const _body = body ? readerFromStreamReader(body.getReader()) : undefined
-                const _end_time = (new Date()).getTime() - _start_time
-                console.log(`time: ${fieldVal}, ${_end_time}`)
-                await request.respond({ status: status, headers, body: _body });
+                const proxyUrl = `http://${server}${request.url}`
+                const _startTime = (new Date()).getTime()
+                await this.proxy(request, proxyUrl)
+                const _endTime = (new Date()).getTime()
+                console.log(`time: ${fieldVal}, ${_endTime - _startTime}`)
             } else {
                 await request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
             }
@@ -126,7 +130,7 @@ class FieldProxy {
                 if (request.url === '/check') {
                     request.respond({ status: 200 });
                 } else {
-                    this.proxy(request).catch((e) => console.log(e))
+                    this.fieldProxy(request).catch((e) => console.log(e))
                 }
             } catch (e) {
                 console.error(e)
