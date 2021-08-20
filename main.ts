@@ -124,18 +124,17 @@ class FieldProxy {
         console.log(`HTTP webserver running.  Access it at:  http://localhost:8080/`);
         for await (const request of server) {
             console.log(`request: ${this.reqCnt}`)
-            this.reqCnt += 1
             try {
                 if (request.url === '/check') {
                     request.respond({ status: 200 });
                 } else {
-                    this.fieldProxy(request).catch((e) => console.log(e))
+                    this.reqCnt += 1
+                    this.fieldProxy(request).catch((e) => console.log(e)).finally(() => this.reqCnt -= 1)
                 }
             } catch (e) {
                 console.error(e)
                 request.respond({ status: 502, body: e.message });
             } finally {
-                this.reqCnt -= 1
                 console.log(`request: ${this.reqCnt}`)
             }
         }
