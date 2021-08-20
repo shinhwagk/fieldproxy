@@ -1,6 +1,5 @@
-import { readAll } from "https://deno.land/std/io/util.ts"
 import { serve, ServerRequest } from "https://deno.land/std@0.103.0/http/server.ts";
-import { readerFromStreamReader } from "https://deno.land/std/io/mod.ts";
+import { readerFromStreamReader, readableStreamFromReader } from "https://deno.land/std/io/mod.ts";
 import { parse } from "https://deno.land/std@0.103.0/encoding/yaml.ts";
 
 interface Conf {
@@ -81,7 +80,7 @@ class LoadBalancer {
 
 }
 
-async function httpClient(server: string, url: string, method: string, headers: Headers, body: string) {
+async function httpClient(server: string, url: string, method: string, headers: Headers, body: BodyInit | null) {
     const res = await fetch(`http://${server}${url}`, {
         method: method,
         headers: headers,
@@ -103,36 +102,32 @@ class FieldProxy {
             const server = this.lb.getServerAddr(fieldVal)
             console.log(server)
             if (server) {
-                const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, (new TextDecoder()).decode(await readAll(request.body)))
-                console.log(status, headers.values(), body)
-                if (body) {
-                    request.respond({ status: status, body: readerFromStreamReader(body.getReader()), headers });
-                } else {
-                    request.respond({ status: status, headers });
-                }
+                const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, readableStreamFromReader(request.body))
+                const _body = body ? readerFromStreamReader(body.getReader()) : undefined
+                await request.respond({ status: status, headers, body: _body });
             } else {
-                request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
+                await request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
             }
         } else {
-            request.respond({ status: 200, body: `filde: ${fieldVal} not null` });
+            await request.respond({ status: 200, body: `filde: ${fieldVal} not specified` });
         }
     }
 
     async start(port: number) {
-        console.log(this.c.c.upstream)
         const server = serve({ port });
         console.log(`HTTP webserver running.  Access it at:  http://localhost:8080/`);
         for await (const request of server) {
+            console.log(`request: ${this.reqCnt}`)
             this.reqCnt += 1
             try {
                 if (request.url === '/check') {
                     request.respond({ status: 200 });
                 } else {
-                    this.proxy(request)
+                    this.proxy(request).catch((e) => console.log(e))
                 }
             } catch (e) {
                 console.error(e)
-                request.respond({ status: 500, body: e.message });
+                request.respond({ status: 502, body: e.message });
             } finally {
                 this.reqCnt -= 1
                 console.log(`request: ${this.reqCnt}`)
