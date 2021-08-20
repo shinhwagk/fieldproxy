@@ -92,7 +92,7 @@ async function httpClient(proxyUrl: string, method: string, headers: Headers, bo
 class FieldProxy {
     private reqCnt = 0
     private readonly c = new Configure()
-    private readonly lb = new FieldBalancer(this.c)
+    private readonly fb = new FieldBalancer(this.c)
 
     async proxy(request: ServerRequest, proxyUrl: string) {
         const { status, headers, body } = await httpClient(proxyUrl, request.method, request.headers, readableStreamFromReader(request.body))
@@ -104,7 +104,7 @@ class FieldProxy {
         const fieldVal = request.headers.get(this.c.c.field)
         console.log(`header: ${this.c.c.field}:${fieldVal}`)
         if (fieldVal) {
-            const server = this.lb.getServerAddr(fieldVal)
+            const server = this.fb.getServerAddr(fieldVal)
             if (server) {
                 const proxyUrl = `http://${server}${request.url}`
                 const _startTime = (new Date()).getTime()
