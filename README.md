@@ -11,8 +11,8 @@ docker run -d -e FP_PORT=8000 -v `pwd`/fieldproxy.yml:/etc/fieldproxy/fieldproxy
 ### config
 
 ```yml
-field: multidatabase-dbid
-outtime: 60
+field: multidatabase-dbid #custom used field
+outtime: 60 # second
 upstream:
   - 4db89bc51bc7:8000
   - 4db89bc51bc6:8000
