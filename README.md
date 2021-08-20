@@ -1,6 +1,6 @@
 # fieldproxy
 
-## samiple http load balancer by custom header filde.
+## samiple http load balancer by custom header field.
 
 ### running
 

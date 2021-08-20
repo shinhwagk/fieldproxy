@@ -112,10 +112,10 @@ class FieldProxy {
                 const _endTime = (new Date()).getTime()
                 console.log(`time: ${fieldVal}, ${_endTime - _startTime}`)
             } else {
-                await request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
+                await request.respond({ status: 200, body: `field: ${fieldVal} not exist` });
             }
         } else {
-            await request.respond({ status: 200, body: `filde: ${fieldVal} not specified` });
+            await request.respond({ status: 200, body: `field: ${fieldVal} not specified` });
         }
     }
 
