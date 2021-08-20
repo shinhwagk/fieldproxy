@@ -123,20 +123,13 @@ class FieldProxy {
         const server = serve({ port });
         console.log(`HTTP webserver running.  Access it at:  http://localhost:8080/`);
         for await (const request of server) {
-            console.log(`request: ${this.reqCnt}`)
-            try {
-                if (request.url === '/check') {
-                    request.respond({ status: 200 });
-                } else {
-                    this.reqCnt += 1
-                    this.fieldProxy(request).catch((e) => console.log(e)).finally(() => this.reqCnt -= 1)
-                }
-            } catch (e) {
-                console.error(e)
-                request.respond({ status: 502, body: e.message });
-            } finally {
-                console.log(`request: ${this.reqCnt}`)
+            if (request.url === '/check') {
+                request.respond({ status: 200 });
+            } else {
+                this.reqCnt += 1
+                this.fieldProxy(request).catch((e) => console.log(e)).finally(() => this.reqCnt -= 1)
             }
+            console.log(`current processing request number: ${this.reqCnt}`)
         }
     }
 }
