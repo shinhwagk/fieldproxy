@@ -22,7 +22,7 @@ class Configure {
     }
 }
 
-class LoadBalancer {
+class FieldBalancer {
     private container: { [server: string]: { [field: string]: LastUsedTime } } = {}
 
     constructor(private readonly c: Configure) {
@@ -92,7 +92,7 @@ async function httpClient(proxyUrl: string, method: string, headers: Headers, bo
 class FieldProxy {
     private reqCnt = 0
     private readonly c = new Configure()
-    private readonly lb = new LoadBalancer(this.c)
+    private readonly lb = new FieldBalancer(this.c)
 
     async proxy(request: ServerRequest, proxyUrl: string) {
         const { status, headers, body } = await httpClient(proxyUrl, request.method, request.headers, readableStreamFromReader(request.body))
