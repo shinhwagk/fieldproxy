@@ -101,12 +101,13 @@ class FieldProxy {
             try {
                 const fieldVal = request.headers.get(this.c.c.field)
                 console.log(`header: ${this.c.c.field}:${fieldVal}`)
-                console.log(`debug: ${request.headers}`)
+                console.log(`debug: ${request.headers.values()}`)
                 if (fieldVal) {
                     const server = this.lb.getServerAddr(fieldVal)
                     console.log(server)
                     if (server) {
                         const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, (new TextDecoder()).decode(await readAll(request.body)))
+                        console.log(status, headers.values(), body)
                         if (body) {
                             request.respond({ status: status, body: readerFromStreamReader(body.getReader()), headers });
                         } else {
