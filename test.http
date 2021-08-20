@@ -1,4 +1,4 @@
-GET http://dbmonitor.weihui.com:3000/v1/catalog/service/multidatabasece-oracle HTTP/1.1
+GET http://consul:3000/v1/catalog/service/multidatabasece-oracle HTTP/1.1
 
 ###
 POST http://127.0.0.1:8080/query HTTP/1.1
