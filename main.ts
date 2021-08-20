@@ -26,10 +26,10 @@ class FieldBalancer {
     private container: { [server: string]: { [field: string]: LastUsedTime } } = {}
 
     constructor(private readonly c: Configure) {
-        setInterval(() => { this.refreshContainer(); this.cleanUnusedField() }, 5000)
+        setInterval(() => { this.refreshContainer(); this.cleanOuttimeField() }, 5000)
     }
 
-    private cleanUnusedField() {
+    private cleanOuttimeField() {
         for (const i of Object.keys(this.container)) {
             for (const [field, ltime] of Object.entries(this.container[i])) {
                 if ((new Date()).getTime() - ltime > 1000 * this.c.c.outtime) {
