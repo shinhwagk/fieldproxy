@@ -1,7 +1,7 @@
 import { serve, ServerRequest } from "https://deno.land/std@0.103.0/http/server.ts";
 import { readerFromStreamReader, readableStreamFromReader } from "https://deno.land/std/io/mod.ts";
 import { parse } from "https://deno.land/std@0.103.0/encoding/yaml.ts";
-import * as log from "https://deno.land/std@$0.103.0/log/mod.ts";
+import * as log from "https://deno.land/std@0.103.0/log/mod.ts";
 
 interface Conf {
     field: string;
@@ -101,7 +101,6 @@ class FieldProxy {
     }
 
     async fieldProxy(request: ServerRequest) {
-
         const fieldVal = request.headers.get(this.c.c.field)
         console.log(`header: ${this.c.c.field}:${fieldVal}`)
         if (fieldVal) {
