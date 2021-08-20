@@ -1,5 +1,5 @@
 import { readAll } from "https://deno.land/std/io/util.ts"
-import { serve } from "https://deno.land/std@0.103.0/http/server.ts";
+import { serve, ServerRequest } from "https://deno.land/std@0.103.0/http/server.ts";
 import { readerFromStreamReader } from "https://deno.land/std/io/mod.ts";
 import { parse } from "https://deno.land/std@0.103.0/encoding/yaml.ts";
 
@@ -91,37 +91,51 @@ async function httpClient(server: string, url: string, method: string, headers: 
 }
 
 class FieldProxy {
+    private reqCnt = 0
     private readonly c = new Configure()
     private readonly lb = new LoadBalancer(this.c)
+
+    async proxy(request: ServerRequest) {
+        const fieldVal = request.headers.get(this.c.c.field)
+        console.log(`header: ${this.c.c.field}:${fieldVal}`)
+        console.log(`debug: ${request.headers.values()}`)
+        if (fieldVal) {
+            const server = this.lb.getServerAddr(fieldVal)
+            console.log(server)
+            if (server) {
+                const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, (new TextDecoder()).decode(await readAll(request.body)))
+                console.log(status, headers.values(), body)
+                if (body) {
+                    request.respond({ status: status, body: readerFromStreamReader(body.getReader()), headers });
+                } else {
+                    request.respond({ status: status, headers });
+                }
+            } else {
+                request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
+            }
+        } else {
+            request.respond({ status: 200, body: `filde: ${fieldVal} not null` });
+        }
+    }
+
     async start(port: number) {
         console.log(this.c.c.upstream)
         const server = serve({ port });
         console.log(`HTTP webserver running.  Access it at:  http://localhost:8080/`);
         for await (const request of server) {
+            this.reqCnt += 1
             try {
-                const fieldVal = request.headers.get(this.c.c.field)
-                console.log(`header: ${this.c.c.field}:${fieldVal}`)
-                console.log(`debug: ${request.headers.values()}`)
-                if (fieldVal) {
-                    const server = this.lb.getServerAddr(fieldVal)
-                    console.log(server)
-                    if (server) {
-                        const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, (new TextDecoder()).decode(await readAll(request.body)))
-                        console.log(status, headers.values(), body)
-                        if (body) {
-                            request.respond({ status: status, body: readerFromStreamReader(body.getReader()), headers });
-                        } else {
-                            request.respond({ status: status, headers });
-                        }
-                    } else {
-                        request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
-                    }
+                if (request.url === '/check') {
+                    request.respond({ status: 200 });
                 } else {
-                    request.respond({ status: 200, body: `filde: ${fieldVal} not null` });
+                    this.proxy(request)
                 }
             } catch (e) {
                 console.error(e)
                 request.respond({ status: 500, body: e.message });
+            } finally {
+                this.reqCnt -= 1
+                console.log(`request: ${this.reqCnt}`)
             }
         }
     }
