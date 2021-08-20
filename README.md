@@ -2,24 +2,30 @@
 
 ## samiple http load balancer by header filde.
 
-abs(hash(s)) % (10 ** 8)
+### running
 
 ```sh
-export CONSUL_ADDR=dbmonitor.weihui.com:3000 
-export CONSUL_SERVICE=multidatabasece-oracle
-deno run --allow-net --allow-env main.ts
+docker run -d -e FP_PORT=8000 -v `pwd`/fieldproxy.yml:/etc/fieldproxy/fieldproxy.yml shinhwagk/fieldproxy:latest
 ```
 
-## test
+### config
+
+```yml
+field: multidatabase-dbid
+outtime: 60
+upstream:
+  - 4db89bc51bc7:8000
+  - 4db89bc51bc6:8000
+```
+
+### test
 
 ```sh
-curl -H "multidatabase-dbid: w31" -XPOST http://test-proxy:8000/query -d '{"db_id":"w31","sql_text":"select * from dual"}'
-curl -H "multidatabase-dbid: w32" -XPOST http://127.0.0.1:8000/query -d '{"db_id":"z11","sql_text":"select * from dual"}'
-curl -H "multidatabase-dbid: w33" -XPOST http://127.0.0.1:8000/query -d '{"db_id":"z11","sql_text":"select * from dual"}'
+curl -H "multidatabase-dbid: w32" -XPOST http://127.0.0.1:8000/path -d 'body'
+curl -H "multidatabase-dbid: w33" -XPOST http://127.0.0.1:8000/path -d 'body'
 ```
 
-## used
+## effect
 
-```
-http header: multidatabase-dbid
-```
+In 60 seconds(by set outtime)，**w32** and **4db89bc51bc7:8000** are tied
+together, **w33** and **4db89bc51bc6:8000** are tied together
