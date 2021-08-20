@@ -110,12 +110,12 @@ class FieldProxy {
                 const _startTime = (new Date()).getTime()
                 await this.proxy(request, proxyUrl)
                 const _endTime = (new Date()).getTime()
-                console.log(`time: ${fieldVal}, ${_endTime - _startTime}`)
+                console.log(`url: ${proxyUrl}, field: ${fieldVal}, time: ${_endTime - _startTime}`)
             } else {
-                await request.respond({ status: 200, body: `field: ${fieldVal} not exist` });
+                await request.respond({ status: 200, body: `no server under upstream.` });
             }
         } else {
-            await request.respond({ status: 200, body: `field: ${fieldVal} not specified` });
+            await request.respond({ status: 200, body: `field: ${fieldVal} not specified.` });
         }
     }
 
