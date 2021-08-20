@@ -13,10 +13,12 @@ type LastUsedTime = number
 
 class Configure {
     f = "/etc/fieldproxy/fieldproxy.yml"
-    c: Conf
+    c: Conf = this.read()
     constructor() {
-        this.c = parse(Deno.readTextFileSync(this.f)) as Conf
-        setInterval(() => this.c = parse(Deno.readTextFileSync(this.f)) as Conf, 5000)
+        setInterval(() => this.c = this.read(), 5000)
+    }
+    read() {
+        return parse(Deno.readTextFileSync(this.f)) as Conf
     }
 }
 
@@ -99,6 +101,7 @@ class FieldProxy {
             try {
                 const fieldVal = request.headers.get(this.c.c.field)
                 console.log(`header: ${this.c.c.field}:${fieldVal}`)
+                console.log(`debug: ${request.headers}`)
                 if (fieldVal) {
                     const server = this.lb.getServerAddr(fieldVal)
                     console.log(server)
