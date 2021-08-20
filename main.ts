@@ -95,6 +95,7 @@ class FieldProxy {
     private readonly lb = new LoadBalancer(this.c)
 
     async proxy(request: ServerRequest) {
+        const _start_time = (new Date()).getTime()
         const fieldVal = request.headers.get(this.c.c.field)
         console.log(`header: ${this.c.c.field}:${fieldVal}`)
         console.log(`debug: ${request.headers.values()}`)
@@ -104,6 +105,8 @@ class FieldProxy {
             if (server) {
                 const { status, headers, body } = await httpClient(server, request.url, request.method, request.headers, readableStreamFromReader(request.body))
                 const _body = body ? readerFromStreamReader(body.getReader()) : undefined
+                const _end_time = (new Date()).getTime() - _start_time
+                console.log(`time: ${fieldVal}, ${_end_time}`)
                 await request.respond({ status: status, headers, body: _body });
             } else {
                 await request.respond({ status: 200, body: `filde: ${fieldVal} not exist` });
