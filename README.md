@@ -5,12 +5,13 @@
 ### running
 
 ```sh
-docker run -d -e FP_PORT=8000 -v `pwd`/fieldproxy.yml:/etc/fieldproxy/fieldproxy.yml shinhwagk/fieldproxy:latest
+docker run -d -v `pwd`/fieldproxy.yml:/etc/fieldproxy/fieldproxy.yml shinhwagk/fieldproxy:latest --log.level=INFO --config.file=/etc/fieldproxy/fieldproxy.yml
 ```
 
 ### config
 
 ```yml
+port: 8000
 field: multidatabase-dbid #custom used field
 outtime: 60 # second
 upstream:
