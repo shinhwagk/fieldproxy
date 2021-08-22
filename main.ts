@@ -40,6 +40,10 @@ interface Conf {
 
 type LastUsedTime = number;
 
+type FieldContainer = {
+  [server: string]: { [fieldVal: string]: LastUsedTime };
+};
+
 class FieldConfigure {
   c: Conf;
   v: string;
@@ -55,9 +59,7 @@ class FieldConfigure {
 }
 
 class FieldBalancer {
-  private readonly container: {
-    [server: string]: { [fieldVal: string]: LastUsedTime };
-  } = {};
+  private readonly container: FieldContainer = {};
 
   constructor(private readonly fc: FieldConfigure) {
     this.refreshContainer();
