@@ -22,7 +22,7 @@ jobs:
         run: |
            version=`cat VERSION`
            echo "::set-output name=version::${version}"
-      - name: Tag Version
+      - name: Create Github Tag
         run: |
           git tag ${{ steps.version.outputs.version }}
           git push --tags
