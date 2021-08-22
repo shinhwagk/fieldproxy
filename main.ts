@@ -56,7 +56,7 @@ class FieldConfigure {
 
 class FieldBalancer {
   private readonly container: {
-    [server: string]: { [field: string]: LastUsedTime };
+    [server: string]: { [fieldVal: string]: LastUsedTime };
   } = {};
 
   constructor(private readonly fc: FieldConfigure) {
