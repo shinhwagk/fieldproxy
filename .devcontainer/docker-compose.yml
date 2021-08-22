@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:cached
+    command: sleep infinity
+  server:
+    image: traefik/whoami
+    deploy:
+      replicas: 10
+  test:
+    image: test1
+    command:
+      - --log.level=DEBUG
+      - --config.file=/etc/fieldproxy/fieldproxy.yml

@@ -1,5 +1,14 @@
-field: multidatabase-dbid
+port: 8000
+field: X-multidatabase-dbid
 outtime: 60
 upstream:
-  - 4db89bc51bc7:8000
-  - 4db89bc51bc6:8000
+  - fieldproxy_devcontainer_server1_1
+  - fieldproxy_devcontainer_server1_2
+  - fieldproxy_devcontainer_server1_3
+  - fieldproxy_devcontainer_server1_4
+  - fieldproxy_devcontainer_server1_5
+  - fieldproxy_devcontainer_server1_6
+  - fieldproxy_devcontainer_server1_7
+  - fieldproxy_devcontainer_server1_8
+  - fieldproxy_devcontainer_server1_9
+  - fieldproxy_devcontainer_server1_10

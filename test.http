@@ -9,3 +9,15 @@ multidatabase-dbid: t11
     "sql_text":"SELECT * FROM v$sql_shared_cursor WHERE sql_id=:1 AND child_number=:2",
     "binds":["716xhkhzwn12h",0]
 }
+
+### test
+GET http://127.0.0.1:8000/query HTTP/1.1
+X-multidatabase-dbid: 11
+
+### test2
+GET http://127.0.0.1:8000 HTTP/1.1
+multidatabase-dbid: 12
+
+
+### 
+GET http://server1 HTTP/1.1

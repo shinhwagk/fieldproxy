@@ -34,3 +34,7 @@ In 60 seconds(by set outtime)，
 http request(w32) & http request(w34) <--> 4db89bc51bc7:8000.
 http request(w33) <--> 4db89bc51bc6:8000.
 ```
+
+```sh
+deno run --allow-net --allow-env --allow-read main.ts --log.level DEBUG --config.file fieldproxy.yml
+```

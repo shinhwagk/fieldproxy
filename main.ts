@@ -1,137 +1,231 @@
-import { serve, ServerRequest } from "https://deno.land/std@0.103.0/http/server.ts";
-import { readerFromStreamReader, readableStreamFromReader } from "https://deno.land/std/io/mod.ts";
-import { parse } from "https://deno.land/std@0.103.0/encoding/yaml.ts";
-import * as log from "https://deno.land/std@0.103.0/log/mod.ts";
+import {
+  Response,
+  serve,
+  ServerRequest,
+} from "https://deno.land/std@0.105.0/http/server.ts";
+import {
+  readableStreamFromReader,
+  readerFromStreamReader,
+} from "https://deno.land/std@0.105.0/io/mod.ts";
+import { parse as yamlParse } from "https://deno.land/std@0.105.0/encoding/yaml.ts";
+import { parse as flagsParse } from "https://deno.land/std@0.105.0/flags/mod.ts";
+import * as log from "https://deno.land/std@0.105.0/log/mod.ts";
 
-interface Conf {
-    field: string;
-    upstream: string[];
-    outtime: number; // default second
+export async function getLogger(ln: log.LevelName = "INFO") {
+  await log.setup({
+    handlers: {
+      console: new log.handlers.ConsoleHandler(ln, {
+        formatter: (rec) =>
+          `${rec.datetime.toJSON()} ${rec.levelName} ${rec.msg}`,
+      }),
+    },
+    loggers: {
+      default: {
+        level: ln,
+        handlers: ["console"],
+      },
+    },
+  });
+  return log.getLogger();
 }
 
-type LastUsedTime = number
+let logger: log.Logger;
 
-class Configure {
-    f = "/etc/fieldproxy/fieldproxy.yml"
-    c: Conf = this.read()
-    constructor() {
-        setInterval(() => this.c = this.read(), 5000)
-    }
-    read() {
-        return parse(Deno.readTextFileSync(this.f)) as Conf
-    }
+interface Conf {
+  field: string;
+  upstream: string[];
+  outtime: number; // default second
+  port: number;
+  loglevel: log.LevelName;
+}
+
+type LastUsedTime = number;
+
+class FieldConfigure {
+  c: Conf;
+  v: string;
+  constructor(private readonly f: string) {
+    this.c = this.read();
+    this.v = Deno.readTextFileSync("VERSION");
+    setInterval(() => this.c = this.read(), 5000);
+  }
+  private read() {
+    logger.debug(`load config file: ${this.f}.`);
+    return yamlParse(Deno.readTextFileSync(this.f)) as Conf;
+  }
 }
 
 class FieldBalancer {
-    private container: { [server: string]: { [field: string]: LastUsedTime } } = {}
+  private readonly container: {
+    [server: string]: { [field: string]: LastUsedTime };
+  } = {};
 
-    constructor(private readonly c: Configure) {
-        setInterval(() => { this.refreshContainer(); this.cleanOuttimeField() }, 5000)
+  constructor(private readonly c: FieldConfigure) {
+    this.refreshContainer();
+    setInterval(() => {
+      this.refreshContainer();
+      this.cleanOuttimeField();
+    }, 5000);
+  }
+
+  private cleanOuttimeField() {
+    for (const i of Object.keys(this.container)) {
+      for (const [field, ltime] of Object.entries(this.container[i])) {
+        if ((new Date()).getTime() - ltime > 1000 * this.c.c.outtime) {
+          delete this.container[i][field];
+        }
+      }
+    }
+  }
+
+  private getContainerFieldsAverage(): number {
+    const cLen = Object.keys(this.container).length;
+    const avg = cLen === 0
+      ? 0
+      : Object.values(this.container).map((s) => Object.keys(s).length).reduce(
+        (a, b) => a + b,
+        0,
+      ) / cLen;
+    return Math.floor(avg);
+  }
+
+  private refreshContainer() {
+    const servers: string[] = this.c.c.upstream;
+    for (const s of Object.keys(this.container)) {
+      if (!servers.includes(s)) {
+        delete this.container[s];
+      }
+    }
+    for (const s of servers) {
+      if (!Object.keys(this.container).includes(s)) {
+        this.container[s] = {};
+      }
+    }
+    logger.debug(this.container);
+  }
+
+  getServerAddr(field: string): string | null {
+    // is exist
+    for (const i of Object.keys(this.container)) {
+      if (Object.keys(this.container[i]).includes(field)) {
+        this.container[i][field] = (new Date()).getTime();
+        return i;
+      }
+    }
+    // if not exist
+    for (const i of Object.keys(this.container)) {
+      if (
+        Object.keys(this.container[i]).length <=
+          this.getContainerFieldsAverage()
+      ) {
+        this.container[i][field] = (new Date()).getTime();
+        return i;
+      }
     }
 
-    private cleanOuttimeField() {
-        for (const i of Object.keys(this.container)) {
-            for (const [field, ltime] of Object.entries(this.container[i])) {
-                if ((new Date()).getTime() - ltime > 1000 * this.c.c.outtime) {
-                    delete this.container[i][field]
-                }
-            }
-        }
-    }
-
-    private getContainerFieldsAverage() {
-        const cLen = Object.keys(this.container).length
-        const avg = cLen === 0 ? 0 : Object.values(this.container).map(s => Object.keys(s).length).reduce((a, b) => a + b, 0) / cLen
-        return Math.floor(avg)
-    }
-
-    private refreshContainer() {
-        const servers: string[] = this.c.c.upstream
-        for (const s of Object.keys(this.container)) {
-            if (!servers.includes(s)) {
-                delete this.container[s]
-            }
-        }
-        for (const s of servers) {
-            if (!Object.keys(this.container).includes(s)) {
-                this.container[s] = {}
-            }
-        }
-        console.log(this.container, this.getContainerFieldsAverage())
-    }
-
-    getServerAddr(field: string): string | null {
-        // is exist
-        for (const i of Object.keys(this.container)) {
-            if (Object.keys(this.container[i]).includes(field)) {
-                this.container[i][field] = (new Date()).getTime()
-                return i
-            }
-        }
-        // if not exist
-        for (const i of Object.keys(this.container)) {
-            if (Object.keys(this.container[i]).length <= this.getContainerFieldsAverage()) {
-                this.container[i][field] = (new Date()).getTime()
-                return i
-            }
-        }
-
-        return Object.keys(this.container).length >= 1 ? Object.keys(this.container)[0] : null;
-    }
+    return Object.keys(this.container).length >= 1
+      ? Object.keys(this.container)[0]
+      : null;
+  }
 }
 
-async function httpClient(proxyUrl: string, method: string, headers: Headers, body: BodyInit | null) {
-    const res = await fetch(proxyUrl, {
-        method: method,
-        headers: headers,
-        body: body
-    })
-    return { status: res.status, headers: res.headers, body: res.body }
+async function httpClient(
+  proxyUrl: string,
+  method: string,
+  headers: Headers,
+  body: ReadableStream<Uint8Array>,
+) {
+  const res = await fetch(proxyUrl, {
+    method: method,
+    headers: headers,
+    body: ["GET", "HEAD"].includes(method) ? undefined : body,
+  });
+  return { status: res.status, headers: res.headers, body: res.body };
 }
 
 class FieldProxy {
-    private reqCnt = 0
-    private readonly c = new Configure()
-    private readonly fb = new FieldBalancer(this.c)
+  private reqPalCnt = 0;
+  private readonly fb;
 
-    async proxy(request: ServerRequest, proxyUrl: string) {
-        const { status, headers, body } = await httpClient(proxyUrl, request.method, request.headers, readableStreamFromReader(request.body))
-        const _body = body ? readerFromStreamReader(body.getReader()) : undefined
-        await request.respond({ status: status, headers, body: _body });
-    }
+  constructor(private readonly c: FieldConfigure) {
+    this.fb = new FieldBalancer(c);
+  }
 
-    async fieldProxy(request: ServerRequest) {
-        const fieldVal = request.headers.get(this.c.c.field)
-        console.log(`header: ${this.c.c.field}:${fieldVal}`)
-        if (fieldVal) {
-            const server = this.fb.getServerAddr(fieldVal)
-            if (server) {
-                const proxyUrl = `http://${server}${request.url}`
-                const _startTime = (new Date()).getTime()
-                await this.proxy(request, proxyUrl)
-                const _endTime = (new Date()).getTime()
-                console.log(`url: ${proxyUrl}, field: ${fieldVal}, time: ${_endTime - _startTime}`)
-            } else {
-                await request.respond({ status: 200, body: `no server under upstream.` });
-            }
-        } else {
-            await request.respond({ status: 200, body: `field: ${fieldVal} not specified.` });
+  async proxy(request: ServerRequest, proxyUrl: string): Promise<Response> {
+    request.headers.set("user-agent", `fieldproxy/${this.c.v}`);
+    const { status, headers, body } = await httpClient(
+      proxyUrl,
+      request.method,
+      request.headers,
+      readableStreamFromReader(request.body),
+    );
+    const _body = body ? readerFromStreamReader(body.getReader()) : undefined;
+    return { status, headers, body: _body };
+  }
+
+  async fieldProxy(request: ServerRequest) {
+    const fieldVal = request.headers.get(this.c.c.field);
+    request.headers.forEach((v, k) => logger.debug(k, v));
+    logger.debug(`header: ${this.c.c.field}:${fieldVal}`);
+    if (fieldVal) {
+      const server = this.fb.getServerAddr(fieldVal);
+      if (server) {
+        const proxyUrl = `http://${server}${request.url}`;
+        logger.info(`field: ${this.c.c.field}:${fieldVal} -> ${server}`);
+        try {
+          const _startTime = (new Date()).getTime();
+          const res = await this.proxy(request, proxyUrl);
+          const _endTime = (new Date()).getTime();
+          await request.respond(res);
+          logger.debug(
+            `field: ${fieldVal} -> ${server}, time: ${_endTime - _startTime}`,
+          );
+        } catch (e) {
+          logger.error(e.message);
+          await request.respond({ status: 502, body: e.message });
         }
+      } else {
+        await request.respond({
+          status: 200,
+          body: `no servers under upstream.`,
+        });
+      }
+    } else {
+      await request.respond({
+        status: 200,
+        body: `field: ${fieldVal} not specified.`,
+      });
     }
+  }
 
-    async start(port: number) {
-        const server = serve({ port });
-        console.log(`HTTP webserver running.  Access it at:  http://localhost:8080/`);
-        for await (const request of server) {
-            if (request.url === '/check') {
-                request.respond({ status: 200 });
-            } else {
-                this.reqCnt += 1
-                this.fieldProxy(request).catch((e) => console.log(e)).finally(() => this.reqCnt -= 1)
-            }
-            console.log(`current processing request number: ${this.reqCnt}`)
-        }
+  async start() {
+    const server = serve({ port: this.c.c.port });
+    logger.info(
+      `HTTP webserver running.  Access it at:  http://localhost:8080/`,
+    );
+    for await (const request of server) {
+      if (request.url === "/check") {
+        request.respond({ status: 200 });
+      } else {
+        this.reqPalCnt += 1;
+        this.fieldProxy(request)
+          .catch((e: Error) => logger.error(e.message))
+          .finally(() => this.reqPalCnt -= 1);
+      }
+      logger.debug(
+        `current processing parallel request number: ${this.reqPalCnt}`,
+      );
     }
+  }
 }
 
-(new FieldProxy).start(Number(Deno.env.get('FP_PORT') || "8000"))
+async function main() {
+  const args = flagsParse(Deno.args);
+  const argLogLevel = args["log"]["level"];
+  const argFileConf = args["config"]["file"] || "fieldproxy.yml";
+  logger = await getLogger(argLogLevel);
+  const c = new FieldConfigure(argFileConf);
+  (new FieldProxy(c)).start();
+}
+
+main();
