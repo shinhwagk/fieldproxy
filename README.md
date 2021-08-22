@@ -12,8 +12,8 @@ docker run -d -v `pwd`/fieldproxy.yml:/etc/fieldproxy/fieldproxy.yml shinhwagk/f
 
 ```yml
 port: 8000
-field: X-multidatabase-dbid #custom header field for load balancer
-outtime: 60 # second
+field: X-multidatabase-dbid #custom header field for load balancer.
+outtime: 60 # second, when the field value is not requested within 60 seconds, the binding with the service is released.
 upstream:
   - 4db89bc51bc7:8000
   - 4db89bc51bc6:8000
