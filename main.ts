@@ -220,8 +220,8 @@ class FieldProxy {
 
 async function main() {
   const args = flagsParse(Deno.args);
-  const argLogLevel = args["log"]["level"];
-  const argConfigFile = args["config"]["file"];
+  const argLogLevel = args.log?.level;
+  const argConfigFile = args.config?.file;
   logger = await getLogger(argLogLevel);
   const fc = new FieldConfigure(argConfigFile);
   (new FieldProxy(fc)).start();
