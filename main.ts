@@ -36,7 +36,6 @@ interface Conf {
   upstream: string[];
   outtime: number; // default second
   port: number;
-  loglevel: log.LevelName;
 }
 
 type LastUsedTime = number;
@@ -60,7 +59,7 @@ class FieldBalancer {
     [server: string]: { [field: string]: LastUsedTime };
   } = {};
 
-  constructor(private readonly c: FieldConfigure) {
+  constructor(private readonly fc: FieldConfigure) {
     this.refreshContainer();
     setInterval(() => {
       this.refreshContainer();
@@ -71,7 +70,7 @@ class FieldBalancer {
   private cleanOuttimeField() {
     for (const i of Object.keys(this.container)) {
       for (const [field, ltime] of Object.entries(this.container[i])) {
-        if ((new Date()).getTime() - ltime > 1000 * this.c.c.outtime) {
+        if ((new Date()).getTime() - ltime > 1000 * this.fc.c.outtime) {
           delete this.container[i][field];
         }
       }
@@ -90,7 +89,7 @@ class FieldBalancer {
   }
 
   private refreshContainer() {
-    const servers: string[] = this.c.c.upstream;
+    const servers: string[] = this.fc.c.upstream;
     for (const s of Object.keys(this.container)) {
       if (!servers.includes(s)) {
         delete this.container[s];
@@ -222,10 +221,10 @@ class FieldProxy {
 async function main() {
   const args = flagsParse(Deno.args);
   const argLogLevel = args["log"]["level"];
-  const argFileConf = args["config"]["file"] || "fieldproxy.yml";
+  const argConfigFile = args["config"]["file"];
   logger = await getLogger(argLogLevel);
-  const c = new FieldConfigure(argFileConf);
-  (new FieldProxy(c)).start();
+  const fc = new FieldConfigure(argConfigFile);
+  (new FieldProxy(fc)).start();
 }
 
 main();
