@@ -43,7 +43,7 @@ type LastUsedTime = number;
 class FieldConfigure {
   c: Conf;
   v: string;
-  constructor(private readonly f: string) {
+  constructor(private readonly f: string = "/etc/fieldproxy/fieldproxy.yml") {
     this.c = this.read();
     this.v = Deno.readTextFileSync("VERSION");
     setInterval(() => this.c = this.read(), 5000);
