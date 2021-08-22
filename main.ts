@@ -201,6 +201,7 @@ class FieldProxy {
 
   async start() {
     const server = serve({ port: this.c.c.port });
+    logger.info(`fieldproxy version: ${this.c.v}`);
     logger.info(
       `HTTP webserver running.  Access it at:  http://localhost:8080/`,
     );
