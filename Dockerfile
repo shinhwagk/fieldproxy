@@ -1,7 +1,7 @@
 FROm denoland/deno
+ARG VERSION
 WORKDIR /build
-ADD main.ts .
-RUN deno bundle main.ts bundle.js  
+RUN deno bundle https://github.com/shinhwagk/fieldproxy/raw/${VERSION}/main.ts bundle.js
 
 FROM denoland/deno:alpine-1.13.1
 WORKDIR /app

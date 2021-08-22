@@ -10,8 +10,6 @@ jobs:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
     steps:
-      - name: Display Version
-        run: echo VERSION
       - name: Check out the repo
         uses: actions/checkout@v2
       - name: Log in to Docker Hub
@@ -28,6 +26,8 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: true
+          build-args: |
+            VERSION=${{ steps.version.outputs.version }}
           tags: |
             shinhwagk/fieldproxy:${{ steps.version.outputs.version }}
             shinhwagk/fieldproxy:latest
