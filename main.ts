@@ -117,7 +117,7 @@ class FieldBalancer {
     for (const i of Object.keys(this.container)) {
       if (
         Object.keys(this.container[i]).length <=
-          this.getContainerFieldsAverage()
+        this.getContainerFieldsAverage()
       ) {
         this.container[i][field] = (new Date()).getTime();
         return i;
@@ -187,13 +187,13 @@ class FieldProxy {
         }
       } else {
         await request.respond({
-          status: 200,
+          status: 502,
           body: `no servers under upstream.`,
         });
       }
     } else {
       await request.respond({
-        status: 200,
+        status: 502,
         body: `field: ${fieldVal} not specified.`,
       });
     }
