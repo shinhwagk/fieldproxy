@@ -3,7 +3,7 @@ ARG VERSION
 WORKDIR /build
 RUN deno bundle https://github.com/shinhwagk/fieldproxy/raw/${VERSION}/main.ts bundle.js
 
-FROM denoland/deno:alpine-1.13.1
+FROM denoland/deno:alpine-1.16.1
 WORKDIR /app
 ADD fieldproxy.yml /etc/fieldproxy/fieldproxy.yml
 ADD VERSION .
