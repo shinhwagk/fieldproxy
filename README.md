@@ -1,7 +1,18 @@
 # fieldproxy
 
 ## a simple http load balancer by custom header field.
-> a request with custom header field enter into the proxy server, if the value of the field appears for the first time, then select a server with the least number of bound fields under upstream.
+
+> a request with custom header field enter into the proxy server, if the value
+> of the field appears for the first time, then select a server with the least
+> number of bound fields under upstream.
+
+### envs
+
+- PROXY_PORT
+- PROXY_FIELD
+- PROXY_UPSTREAM_FILE
+- PROXY_OUTTIME
+- PROXY_LOG_LEVEL
 
 ### running
 
