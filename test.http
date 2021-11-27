@@ -1,8 +1,8 @@
 GET http://consul:3000/v1/catalog/service/multidatabasece-oracle HTTP/1.1
 
 ###
-POST http://127.0.0.1:8080/query HTTP/1.1
-multidatabase-dbid: t11
+POST http://127.0.0.1:8000/query HTTP/1.1
+x-multidatabase-dbid: t11
 
 {
     "db_id":"t11",
@@ -15,9 +15,11 @@ GET http://127.0.0.1:8000/query HTTP/1.1
 X-multidatabase-dbid: 11
 
 ### test2
-GET http://127.0.0.1:8000 HTTP/1.1
-multidatabase-dbid: 12
+GET http://127.0.0.1:8000/check HTTP/1.1
+
+### test2
+GET http://127.0.0.1:8000/refresh HTTP/1.1
 
 
 ### 
-GET http://server1 HTTP/1.1
+GET http://fieldproxy_devcontainer_server_2 HTTP/1.1

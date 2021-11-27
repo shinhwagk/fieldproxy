@@ -11,7 +11,7 @@ services:
   server:
     image: traefik/whoami
     deploy:
-      replicas: 10
+      replicas: 2
   test:
     image: test1
     command:
