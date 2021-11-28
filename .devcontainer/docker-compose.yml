@@ -12,8 +12,13 @@ services:
     image: traefik/whoami
     deploy:
       replicas: 2
-  test:
-    image: test1
-    command:
-      - --log.level=DEBUG
-      - --config.file=/etc/fieldproxy/fieldproxy.yml
+  consul:
+    image: consul
+  consul-template:
+    image: hashicorp/consul-template
+    user: root
+    command: sleep infinity
+    # |
+    #   apk add curl
+    #   apk add jq
+    #   consul-template -consul-addr "consul:8500" -exec "jq -c '[.[] | (.ServiceAddress+\":\"+(.ServicePort|tostring))]' | curl -XPOST -d @- http://app:8000/upstream"

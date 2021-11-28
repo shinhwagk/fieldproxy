@@ -1,17 +1,16 @@
-import { parse as yamlParse } from "https://deno.land/std@0.116.0/encoding/yaml.ts";
 import * as log from "https://deno.land/std@0.116.0/log/mod.ts";
 
-async function getLogger(ln: log.LevelName = "INFO") {
+async function getLogger(lln: log.LevelName = "INFO") {
   await log.setup({
     handlers: {
-      console: new log.handlers.ConsoleHandler(ln, {
+      console: new log.handlers.ConsoleHandler(lln, {
         formatter: (rec) =>
           `${rec.datetime.toJSON()} ${rec.levelName} ${rec.msg}`,
       }),
     },
     loggers: {
       default: {
-        level: ln,
+        level: lln,
         handlers: ["console"],
       },
     },
@@ -21,9 +20,6 @@ async function getLogger(ln: log.LevelName = "INFO") {
 
 let logger: log.Logger;
 
-interface Upstream {
-  upstream: string[];
-}
 type LastUsedTime = number;
 
 type FieldContainer = {
@@ -31,14 +27,24 @@ type FieldContainer = {
 };
 
 class FieldBalancer {
+  private upstream: string[] = []
   private readonly container: FieldContainer = {};
 
-  constructor(private readonly upstreamFile: string, private readonly outime: number) {
+  constructor(private readonly outime: number) {
     this.refreshContainer();
     setInterval(() => {
       this.refreshContainer();
       this.cleanOuttimeField();
     }, 5000);
+  }
+
+  public getUpstream(): string[] {
+    return this.upstream
+  }
+
+  public updateUpstream(upstream: string[]) {
+    this.upstream = upstream
+    this.refreshContainer()
   }
 
   private cleanOuttimeField() {
@@ -55,21 +61,21 @@ class FieldBalancer {
     const cLen = Object.keys(this.container).length;
     const avg = cLen === 0
       ? 0
-      : Object.values(this.container).map((s) => Object.keys(s).length).reduce(
-        (a, b) => a + b,
-        0,
-      ) / cLen;
+      : Object.values(this.container)
+        .map((s) => Object.keys(s).length)
+        .reduce((a, b) => a + b, 0,)
+      / cLen;
     return Math.floor(avg);
   }
 
   public refreshContainer(mode: 'manual' | 'auto' = 'auto') {
-    const { upstream } = yamlParse(Deno.readTextFileSync(this.upstreamFile)) as Upstream;
+    // const { upstream } = yamlParse(Deno.readTextFileSync(this.upstreamFile)) as Upstream;
     for (const s of Object.keys(this.container)) {
-      if (!upstream.includes(s)) {
+      if (!this.upstream.includes(s)) {
         delete this.container[s];
       }
     }
-    for (const s of upstream) {
+    for (const s of this.upstream) {
       if (!Object.keys(this.container).includes(s)) {
         this.container[s] = {};
       }
@@ -160,22 +166,28 @@ class FieldProxy {
 
   async handle(request: Request): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === "/check") {
+    if (request.method === 'GET' && url.pathname === "/check") {
       return new Response(null, { status: 200 })
-    } else if (url.pathname === "/refresh") {
-      this.fb.refreshContainer('manual')
-      logger.info('upstream file refreash.')
-      return new Response('upstream file refreash.', { status: 200 })
-    }
+    } else if (url.pathname === "/upstream") {
+      if (request.method === 'POST') {
+        try {
+          const upstream = await request.json()
+          this.fb.updateUpstream(upstream)
+          logger.info(`upstream updated.`)
+          return new Response(`upstream updated. \nupstream: ${JSON.stringify(upstream)}.`, { status: 200 })
+        } catch (e) {
+          return new Response(`upstream update filed, error: ${e}`, { status: 502, });
+        }
+      } else if (request.method === "GET") {
+        return new Response(`upstream list: ${JSON.stringify(this.fb.getUpstream())}`, { status: 200, });
+      }
 
-    try {
-      return await this.fieldProxy(request)
-    } catch (e) {
-      logger.error(e.message)
-      return new Response(`no servers under upstream.`, { status: 502 });
-    } finally {
-      this.reqPalCnt -= 1
+      // this.fb.refreshContainer('manual')
+
     }
+    // this.reqPalCnt -= 1
+    return await this.fieldProxy(request)
+
   }
 
   async start(port: number) {
@@ -195,11 +207,10 @@ class FieldProxy {
 async function main() {
   const PROXY_PORT = Deno.env.get("PROXY_PORT") || '8000';
   const PROXY_FIELD = Deno.env.get("PROXY_FIELD") || 'x-proxyfield';
-  const PROXY_UPSTREAM_FILE = Deno.env.get("PROXY_UPSTREAM_FILE") || '/etc/fieldproxy/upstream.yml';
   const PROXY_OUTTIME = Deno.env.get("PROXY_OUTTIME") || '60';
   const PROXY_LOG_LEVEL = (Deno.env.get("PROXY_LOG_LEVEL") || 'INFO') as log.LevelName;
   logger = await getLogger(PROXY_LOG_LEVEL);
-  const fb = new FieldBalancer(PROXY_UPSTREAM_FILE, Number(PROXY_OUTTIME));
+  const fb = new FieldBalancer(Number(PROXY_OUTTIME));
   (new FieldProxy(PROXY_FIELD, fb)).start(Number(PROXY_PORT));
 }
 

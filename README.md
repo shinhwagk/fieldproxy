@@ -10,7 +10,6 @@
 
 - PROXY_PORT
 - PROXY_FIELD
-- PROXY_UPSTREAM_FILE
 - PROXY_OUTTIME
 - PROXY_LOG_LEVEL
 
@@ -24,27 +23,25 @@ docker run -d \
   --config.file=/etc/fieldproxy/fieldproxy.yml
 ```
 
-### config file (fieldproxy.yml)
+### update upstream list
 
-```yml
-port: 8000
-field: X-multidatabase-dbid # custom header field for load balancer.
-outtime: 60 # second, when the field value is not requested within 60 seconds, the binding with the service is released.
-upstream:
-  - 4db89bc51bc7:8000
-  - 4db89bc51bc6:8000
+- data.json
+
+```json
+[
+  { "server": "fieldproxy_devcontainer_server_2", "port": 80 },
+  { "server": "fieldproxy_devcontainer_server_1", "port": 80 }
+]
 ```
 
-### config file for consul template
+- update upstream
 
-```yml
-port: 8000
-field: X-multidatabase-dbid #custom header field for load balancer
-outtime: 60 # second
-upstream:
-  {{- range service "custom_services" }}
-  - {{ .Address }}:{{ .Port }}
-  {{- end }}
+```sh
+# manaul by curl
+curl http://consul:8500/v1/catalog/service/fieldproxy | jq -c '[.[] | (.ServiceAddress+":"+(.ServicePort|tostring))]'
+# by consul-template
+consul-template -consul-addr "consul:8500" -exec "curl -s http://consul:8500/v1/catalog/service/fieldproxy | jq -c '[.[] | (.ServiceAddress+\":\"+(.Serv
+icePort|tostring))]' | curl -XPOST -d @- http://app:8000/upstream"
 ```
 
 ### test: three http request
