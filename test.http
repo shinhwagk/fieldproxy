@@ -1,8 +1,11 @@
-GET http://consul:3000/v1/catalog/service/multidatabasece-oracle HTTP/1.1
+GET http://consul:8500/v1/catalog/services HTTP/1.1
+
+###
+GET http://consul:8500/v1/catalog/service/fieldproxy HTTP/1.1
 
 ###
 POST http://127.0.0.1:8000/query HTTP/1.1
-x-multidatabase-dbid: t11
+x-multidatabase-dbid: t12
 
 {
     "db_id":"t11",
@@ -14,15 +17,6 @@ x-multidatabase-dbid: t11
 GET http://127.0.0.1:8000/query HTTP/1.1
 X-multidatabase-dbid: 11
 
-### test2
-POST http://127.0.0.1:8000/upstream HTTP/1.1
-Content-Type: application/json
-
-["fieldproxy_devcontainer_server_1","fieldproxy_devcontainer_server_2"]
-
-### test2
-GET http://127.0.0.1:8000/upstream HTTP/1.1
-
 
 ### 
 GET http://fieldproxy_devcontainer_server_2 HTTP/1.1
@@ -31,8 +25,13 @@ GET http://fieldproxy_devcontainer_server_2 HTTP/1.1
 PUT http://consul:8500/v1/agent/service/register HTTP/1.1
 Content-Type: application/json
 
-{"id":"f2","name": "fieldproxy","address": "fieldproxy_devcontainer_server_1","port": 80}
+{"id":"f3", "name": "fieldproxy","address": "fieldproxy_devcontainer_server_2","port": 80}
 
+### resiger service to consul
+PUT http://consul:8500/v1/agent/service/deregister/ccc1 HTTP/1.1
+ 
+
+ 
 ### list consul agent services
 GET http://consul:8500/v1/agent/services HTTP/1.1
 

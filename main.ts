@@ -1,5 +1,7 @@
 import * as log from "https://deno.land/std@0.116.0/log/mod.ts";
 
+const VERSION = "0.0.17-test1"
+
 async function getLogger(lln: log.LevelName = "INFO") {
   await log.setup({
     handlers: {
@@ -27,24 +29,13 @@ type FieldContainer = {
 };
 
 class FieldBalancer {
-  private upstream: string[] = []
+  private services: string[] = []
   private readonly container: FieldContainer = {};
 
-  constructor(private readonly outime: number) {
-    this.refreshContainer();
-    setInterval(() => {
-      this.refreshContainer();
-      this.cleanOuttimeField();
-    }, 5000);
-  }
+  constructor(private readonly outime: number) { }
 
-  public getUpstream(): string[] {
-    return this.upstream
-  }
-
-  public updateUpstream(upstream: string[]) {
-    this.upstream = upstream
-    this.refreshContainer()
+  public setServices(services: string[]) {
+    this.services = services
   }
 
   private cleanOuttimeField() {
@@ -68,27 +59,22 @@ class FieldBalancer {
     return Math.floor(avg);
   }
 
-  public refreshContainer(mode: 'manual' | 'auto' = 'auto') {
-    // const { upstream } = yamlParse(Deno.readTextFileSync(this.upstreamFile)) as Upstream;
+  public refreshContainer() {
     for (const s of Object.keys(this.container)) {
-      if (!this.upstream.includes(s)) {
+      if (!this.services.includes(s)) {
         delete this.container[s];
       }
     }
-    for (const s of this.upstream) {
+    for (const s of this.services) {
       if (!Object.keys(this.container).includes(s)) {
         this.container[s] = {};
       }
     }
 
-    if (mode === 'manual') {
-      logger.info(this.container)
-    } else {
-      logger.debug(this.container)
-    }
+    this.cleanOuttimeField()
   }
 
-  public getServerAddr(field: string): string | null {
+  public getServiceAddr(field: string): string | null {
     // is exist
     for (const i of Object.keys(this.container)) {
       if (Object.keys(this.container[i]).includes(field)) {
@@ -114,8 +100,7 @@ class FieldBalancer {
 }
 
 class FieldProxy {
-  private reqPalCnt = 0;
-  private version = Deno.readTextFileSync("VERSION");
+  // private reqPalCnt = 0;
 
   constructor(
     private readonly field: string,
@@ -128,7 +113,7 @@ class FieldProxy {
     url.hostname = host
     url.port = port || '80'
     const headers = new Headers(request.headers)
-    headers.set("user-agent", `fieldproxy/${this.version}`)
+    headers.set("user-agent", `fieldproxy/${VERSION}`)
     return await fetch(
       url,
       {
@@ -144,7 +129,7 @@ class FieldProxy {
     request.headers.forEach((v, k) => logger.debug(k, v));
     logger.debug(`header: ${this.field}:${fieldVal}`);
     if (fieldVal) {
-      const proxyServer = this.fb.getServerAddr(fieldVal);
+      const proxyServer = this.fb.getServiceAddr(fieldVal);
       if (proxyServer) {
         try {
           logger.info(`field: ${this.field}:${fieldVal} -> ${proxyServer}`);
@@ -157,7 +142,7 @@ class FieldProxy {
           return new Response(e.message, { status: 502 });
         }
       } else {
-        return new Response(`no servers under upstream.`, { status: 502 });
+        return new Response(`no servers under services.`, { status: 502 });
       }
     } else {
       return new Response(`field: ${fieldVal} not specified.`, { status: 502, });
@@ -168,23 +153,24 @@ class FieldProxy {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === "/check") {
       return new Response(null, { status: 200 })
-    } else if (url.pathname === "/upstream") {
-      if (request.method === 'POST') {
-        try {
-          const upstream = await request.json()
-          this.fb.updateUpstream(upstream)
-          logger.info(`upstream updated.`)
-          return new Response(`upstream updated. \nupstream: ${JSON.stringify(upstream)}.`, { status: 200 })
-        } catch (e) {
-          return new Response(`upstream update filed, error: ${e}`, { status: 502, });
-        }
-      } else if (request.method === "GET") {
-        return new Response(`upstream list: ${JSON.stringify(this.fb.getUpstream())}`, { status: 200, });
-      }
-
-      // this.fb.refreshContainer('manual')
-
     }
+    // else if (url.pathname === "/services") {
+    //   if (request.method === 'POST') {
+    //     try {
+    //       const services = await request.json()
+    //       this.fb.updateUpstream(services)
+    //       logger.info(`services updated.`)
+    //       return new Response(`services updated. \nupstream: ${JSON.stringify(services)}.`, { status: 200 })
+    //     } catch (e) {
+    //       return new Response(`services update filed, error: ${e}`, { status: 502, });
+    //     }
+    //   } else if (request.method === "GET") {
+    //     return new Response(`services list: ${JSON.stringify(this.fb.getUpstream())}`, { status: 200, });
+    //   }
+
+    //   // this.fb.refreshContainer('manual')
+
+    // }
     // this.reqPalCnt -= 1
     return await this.fieldProxy(request)
 
@@ -192,6 +178,7 @@ class FieldProxy {
 
   async start(port: number) {
     const server = Deno.listen({ port });
+    logger.info(`fieldporxy running.  Access it at:  http://:${port}/`)
     for await (const conn of server) {
       (async () => {
         const httpConn = Deno.serveHttp(conn);
@@ -204,14 +191,50 @@ class FieldProxy {
   }
 }
 
+async function getBackendServices(consulAddr: string, consulService: string): Promise<string[]> {
+  try {
+    return await fetch(`http://${consulAddr}/v1/health/service/${consulService}?passing=true`)
+      .then(res => res.json())
+      .then((services: { Service: { Address: string, Port: number } }[]) =>
+        services.map(r => `${r.Service.Address}:${r.Service.Port}`)
+      )
+  } catch (e) {
+    logger.error(`consul error ${e}`)
+    return []
+  }
+}
+
+function consoleServices(services: string[]) {
+  logger.debug(`list services:`)
+  for (const s of services) {
+    logger.debug(`  - ${s}`)
+  }
+}
+
 async function main() {
   const PROXY_PORT = Deno.env.get("PROXY_PORT") || '8000';
   const PROXY_FIELD = Deno.env.get("PROXY_FIELD") || 'x-proxyfield';
-  const PROXY_OUTTIME = Deno.env.get("PROXY_OUTTIME") || '60';
+  const PROXY_OUTTIME = Deno.env.get("PROXY_OUTTIME") || '60'; // second
   const PROXY_LOG_LEVEL = (Deno.env.get("PROXY_LOG_LEVEL") || 'INFO') as log.LevelName;
+  const PROXY_CONSUL_ADDR = Deno.env.get("PROXY_CONSUL_ADDR") || '';
+  const PROXY_CONSUL_SERVICE = Deno.env.get("PROXY_CONSUL_SERVICE") || '';
+
   logger = await getLogger(PROXY_LOG_LEVEL);
-  const fb = new FieldBalancer(Number(PROXY_OUTTIME));
-  (new FieldProxy(PROXY_FIELD, fb)).start(Number(PROXY_PORT));
+
+  const fieldBalancer = new FieldBalancer(Number(PROXY_OUTTIME));
+
+  const fn = async () => {
+    const services = await getBackendServices(PROXY_CONSUL_ADDR, PROXY_CONSUL_SERVICE);
+    fieldBalancer.setServices(services);
+    fieldBalancer.refreshContainer();
+    consoleServices(services)
+  };
+
+  setTimeout(fn, 1000);
+  setInterval(fn, Number(PROXY_OUTTIME) * 1000);
+
+  (new FieldProxy(PROXY_FIELD, fieldBalancer))
+    .start(Number(PROXY_PORT));
 }
 
 main();

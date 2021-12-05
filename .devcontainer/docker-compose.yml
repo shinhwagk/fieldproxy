@@ -14,11 +14,3 @@ services:
       replicas: 2
   consul:
     image: consul
-  consul-template:
-    image: hashicorp/consul-template
-    user: root
-    command: sleep infinity
-    # |
-    #   apk add curl
-    #   apk add jq
-    #   consul-template -consul-addr "consul:8500" -exec "jq -c '[.[] | (.ServiceAddress+\":\"+(.ServicePort|tostring))]' | curl -XPOST -d @- http://app:8000/upstream"
