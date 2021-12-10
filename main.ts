@@ -1,6 +1,6 @@
 import * as log from "https://deno.land/std@0.116.0/log/mod.ts";
 
-const VERSION = "0.0.17-test1"
+const VERSION = Deno.args[0]
 
 async function getLogger(lln: log.LevelName = "INFO") {
   await log.setup({
