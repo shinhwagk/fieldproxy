@@ -1,4 +1,4 @@
-FROm denoland/deno
+FROM denoland/deno
 RUN mkdir -p /build
 RUN deno compile -o /build/fp --allow-env --allow-net main.ts
 
