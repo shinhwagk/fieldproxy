@@ -26,6 +26,8 @@ jobs:
         run: |
           git tag ${{ steps.version.outputs.version }}
           git push --tags
+      - name: test
+        run: ls -l ./; pwd
       - name: Push to Docker Hub
         uses: docker/build-push-action@v2
         with:
