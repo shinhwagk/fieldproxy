@@ -192,8 +192,8 @@ async function getBackendServices(consulAddr: string, consulService: string): Pr
   }
 }
 
-function consoleServices(services: string[]) {
-  logger.debug(`list services:`)
+function consoleServices(services: string[], consulService: string) {
+  logger.debug(`list service [${consulService}]:`)
   for (const s of services) {
     logger.debug(`  - ${s}`)
   }
@@ -216,11 +216,11 @@ async function main() {
     const services = await getBackendServices(PROXY_CONSUL_ADDR, PROXY_CONSUL_SERVICE);
     fieldBalancer.setServices(services);
     fieldBalancer.refreshContainer();
-    consoleServices(services);
+    consoleServices(services, PROXY_CONSUL_SERVICE);
   };
 
   setTimeout(fn, 1000);
-  setInterval(fn, 100);
+  setInterval(fn, 1000);
 
   (new FieldProxy(PROXY_FIELD, fieldBalancer))
     .start(Number(PROXY_PORT));
