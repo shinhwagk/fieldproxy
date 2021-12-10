@@ -100,7 +100,7 @@ class FieldBalancer {
 }
 
 class FieldProxy {
-  // private reqPalCnt = 0;
+  private reqPallCnt = 0;
 
   constructor(
     private readonly field: string,
@@ -154,26 +154,7 @@ class FieldProxy {
     if (request.method === 'GET' && url.pathname === "/check") {
       return new Response(null, { status: 200 })
     }
-    // else if (url.pathname === "/services") {
-    //   if (request.method === 'POST') {
-    //     try {
-    //       const services = await request.json()
-    //       this.fb.updateUpstream(services)
-    //       logger.info(`services updated.`)
-    //       return new Response(`services updated. \nupstream: ${JSON.stringify(services)}.`, { status: 200 })
-    //     } catch (e) {
-    //       return new Response(`services update filed, error: ${e}`, { status: 502, });
-    //     }
-    //   } else if (request.method === "GET") {
-    //     return new Response(`services list: ${JSON.stringify(this.fb.getUpstream())}`, { status: 200, });
-    //   }
-
-    //   // this.fb.refreshContainer('manual')
-
-    // }
-    // this.reqPalCnt -= 1
     return await this.fieldProxy(request)
-
   }
 
   async start(port: number) {
@@ -183,8 +164,15 @@ class FieldProxy {
       (async () => {
         const httpConn = Deno.serveHttp(conn);
         for await (const requestEvent of httpConn) {
-          const res = await this.handle(requestEvent.request)
-          await requestEvent.respondWith(res)
+          try {
+            this.reqPallCnt += 1
+            const res = await this.handle(requestEvent.request)
+            await requestEvent.respondWith(res)
+          } catch (e) {
+            logger.error(`http request error: ${e}`)
+          } finally {
+            this.reqPallCnt -= 1
+          }
         }
       })();
     }
@@ -212,7 +200,8 @@ function consoleServices(services: string[]) {
 }
 
 async function main() {
-  const PROXY_PORT = Deno.env.get("PROXY_PORT") || '8000';
+  // const PROXY_PORT = Deno.env.get("PROXY_PORT") || '8000';
+  const PROXY_PORT = '8000'
   const PROXY_FIELD = Deno.env.get("PROXY_FIELD") || 'x-proxyfield';
   const PROXY_OUTTIME = Deno.env.get("PROXY_OUTTIME") || '60'; // second
   const PROXY_LOG_LEVEL = (Deno.env.get("PROXY_LOG_LEVEL") || 'INFO') as log.LevelName;
@@ -231,7 +220,7 @@ async function main() {
   };
 
   setTimeout(fn, 1000);
-  setInterval(fn, Number(PROXY_OUTTIME) * 1000);
+  setInterval(fn, 100);
 
   (new FieldProxy(PROXY_FIELD, fieldBalancer))
     .start(Number(PROXY_PORT));

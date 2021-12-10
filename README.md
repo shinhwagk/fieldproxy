@@ -8,10 +8,11 @@
 
 ### envs
 
-- PROXY_PORT
 - PROXY_FIELD
 - PROXY_OUTTIME
 - PROXY_LOG_LEVEL
+- PROXY_CONSUL_ADDR
+- PROXY_CONSUL_SERVICE
 
 ### running
 
@@ -67,4 +68,10 @@ export PROXY_LOG_LEVEL=DEBUG
 export PROXY_CONSUL_ADDR=consul:8500
 export PROXY_CONSUL_SERVICE=fieldproxy
 export PROXY_OUTTIME=60
+```
+
+## compile
+
+```sh
+mkdir -p dest; deno compile -o dest/fp --allow-env --allow-net main.ts
 ```
