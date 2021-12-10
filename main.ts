@@ -227,7 +227,7 @@ async function main() {
     const services = await getBackendServices(PROXY_CONSUL_ADDR, PROXY_CONSUL_SERVICE);
     fieldBalancer.setServices(services);
     fieldBalancer.refreshContainer();
-    consoleServices(services)
+    consoleServices(services);
   };
 
   setTimeout(fn, 1000);
