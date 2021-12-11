@@ -8,9 +8,9 @@
 
 ### envs
 
-- PROXY_FIELD
-- PROXY_OUTTIME
-- PROXY_LOG_LEVEL
+- FP_FIELD
+- FP_OUTTIME
+- FP_LOG_LEVEL
 - PROXY_CONSUL_ADDR
 - PROXY_CONSUL_SERVICE
 
@@ -63,11 +63,11 @@ http request(w33) <--> 4db89bc51bc6:8000.
 ```
 
 ```sh
-export PROXY_FIELD=x-multidatabase-dbid
-export PROXY_LOG_LEVEL=DEBUG
+export FP_FIELD=x-multidatabase-dbid
+export FP_LOG_LEVEL=DEBUG
 export PROXY_CONSUL_ADDR=consul:8500
 export PROXY_CONSUL_SERVICE=fieldproxy
-export PROXY_OUTTIME=60
+export FP_OUTTIME=60
 ```
 
 ## compile

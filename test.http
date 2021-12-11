@@ -25,15 +25,17 @@ GET http://fieldproxy_devcontainer_server_2 HTTP/1.1
 PUT http://consul:8500/v1/agent/service/register HTTP/1.1
 Content-Type: application/json
 
-{"id":"f2", "name": "fieldproxy","address": "fieldproxy_devcontainer_server_2","port": 80}
+{"id":"f2111", "name": "fieldproxy","address": "fieldproxy_devcontainer_server_2","port": 80}
 
 ### resiger service to consul
 PUT http://consul:8500/v1/agent/service/deregister/f3 HTTP/1.1
- 
 
- 
 ### list consul agent services
 GET http://consul:8500/v1/agent/services HTTP/1.1
 
 ### list consul agent service for fieldproxy
-GET http://consul:8500/v1/catalog/service/fieldproxy HTTP/1.1.
+GET http://consul:8500/v1/catalog/service/fieldproxy HTTP/1.1
+
+
+###
+GET http://consul:8500/v1/health/service/fieldproxy1?passing=true HTTP/1.1

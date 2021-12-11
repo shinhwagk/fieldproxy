@@ -1,0 +1,22 @@
+version: '3'
+
+services:
+  fieldproxy:
+    image: shinhwagk/fieldproxy
+    environment:
+      FP_FIELD:
+      FP_OUTTIME:
+      FP_LOG_LEVEL:
+      CONSUL_ADDR:
+      # FP_PROXY_CONSUL_SERVICE:
+      FP_REGISTER_CONSUL_SERVICE:
+  fieldproxy-watch:
+    image: consul
+    depends_on:
+      - fieldproxy
+    environment:
+      FP_REGISTER_CONSUL_SERVICE:
+      FP_PROXY_CONSUL_SERVICE:
+      CONSUL_HTTP_ADDR: consul:8500
+    command: consul watch -type=service -service=${FP_REGISTER_CONSUL_SERVICE} curl -s https://github.com/shinhwagk/fieldproxy/raw/${VERSION}/fp-handler.sh | sh -s
+

@@ -1,5 +1,6 @@
 {
   "editor.formatOnSave": true,
   "editor.insertSpaces": true,
-  "editor.wordWrap": "on"
+  "editor.wordWrap": "on",
+  "deno.unstable": true
 }

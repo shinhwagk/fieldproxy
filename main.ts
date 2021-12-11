@@ -1,31 +1,27 @@
-import * as log from "https://deno.land/std@0.116.0/log/mod.ts";
+import * as log from "https://deno.land/std@0.117.0/log/mod.ts";
 
 const VERSION = Deno.args[0]
 
-async function getLogger(lln: log.LevelName = "INFO") {
-  await log.setup({
-    handlers: {
-      console: new log.handlers.ConsoleHandler(lln, {
-        formatter: (rec) =>
-          `${rec.datetime.toJSON()} ${rec.levelName} ${rec.msg}`,
-      }),
+const FP_LOG_LEVEL = (Deno.env.get("FP_LOG_LEVEL") || 'INFO') as log.LevelName;
+await log.setup({
+  handlers: {
+    console: new log.handlers.ConsoleHandler(FP_LOG_LEVEL, {
+      formatter: (rec) =>
+        `${rec.datetime.toJSON()} ${rec.levelName} ${rec.msg}`,
+    }),
+  },
+  loggers: {
+    default: {
+      level: FP_LOG_LEVEL,
+      handlers: ["console"],
     },
-    loggers: {
-      default: {
-        level: lln,
-        handlers: ["console"],
-      },
-    },
-  });
-  return log.getLogger();
-}
+  },
+});
 
-let logger: log.Logger;
-
-type LastUsedTime = number;
+const logger: log.Logger = log.getLogger();
 
 type FieldContainer = {
-  [server: string]: { [fieldVal: string]: LastUsedTime };
+  [server: string]: { [fieldVal: string]: number }; // type LastUsedTime = number;
 };
 
 class FieldBalancer {
@@ -153,6 +149,15 @@ class FieldProxy {
     const url = new URL(request.url);
     if (request.method === 'GET' && url.pathname === "/check") {
       return new Response(null, { status: 200 })
+    } else if (request.method === 'PUT' && url.pathname === "/services") {
+      const services = await request.json()
+      this.fb.setServices(services);
+      this.fb.refreshContainer()
+      // logger.debug(`list service [${consulService}]:`)
+      for (const s of services) {
+        logger.info(`  - ${s}`)
+      }
+      return new Response(null, { status: 200 })
     }
     return await this.fieldProxy(request)
   }
@@ -179,51 +184,22 @@ class FieldProxy {
   }
 }
 
-async function getBackendServices(consulAddr: string, consulService: string): Promise<string[]> {
-  try {
-    return await fetch(`http://${consulAddr}/v1/health/service/${consulService}?passing=true`)
-      .then(res => res.json())
-      .then((services: { Service: { Address: string, Port: number } }[]) =>
-        services.map(r => `${r.Service.Address}:${r.Service.Port}`)
-      )
-  } catch (e) {
-    logger.error(`consul error ${e}`)
-    return []
-  }
-}
+function main() {
+  const PROXY_PORT = 8000
+  const FP_FIELD = Deno.env.get("FP_FIELD") || 'x-proxyfield';
+  const FP_OUTTIME = Deno.env.get("FP_OUTTIME") || '60'; // second
+  // const FP_LOG_LEVEL = (Deno.env.get("FP_LOG_LEVEL") || 'INFO') as log.LevelName;
 
-function consoleServices(services: string[], consulService: string) {
-  logger.debug(`list service [${consulService}]:`)
-  for (const s of services) {
-    logger.debug(`  - ${s}`)
-  }
-}
+  const fieldBalancer = new FieldBalancer(Number(FP_OUTTIME));
 
-async function main() {
-  // const PROXY_PORT = Deno.env.get("PROXY_PORT") || '8000';
-  const PROXY_PORT = '8000'
-  const PROXY_FIELD = Deno.env.get("PROXY_FIELD") || 'x-proxyfield';
-  const PROXY_OUTTIME = Deno.env.get("PROXY_OUTTIME") || '60'; // second
-  const PROXY_LOG_LEVEL = (Deno.env.get("PROXY_LOG_LEVEL") || 'INFO') as log.LevelName;
-  const PROXY_CONSUL_ADDR = Deno.env.get("PROXY_CONSUL_ADDR") || '';
-  const PROXY_CONSUL_SERVICE = Deno.env.get("PROXY_CONSUL_SERVICE") || '';
-
-  logger = await getLogger(PROXY_LOG_LEVEL);
-
-  const fieldBalancer = new FieldBalancer(Number(PROXY_OUTTIME));
-
-  const fn = async () => {
-    const services = await getBackendServices(PROXY_CONSUL_ADDR, PROXY_CONSUL_SERVICE);
-    fieldBalancer.setServices(services);
+  const fn = () => {
     fieldBalancer.refreshContainer();
-    consoleServices(services, PROXY_CONSUL_SERVICE);
   };
 
-  setTimeout(fn, 1000);
   setInterval(fn, 1000);
 
-  (new FieldProxy(PROXY_FIELD, fieldBalancer))
-    .start(Number(PROXY_PORT));
+  (new FieldProxy(FP_FIELD, fieldBalancer))
+    .start(PROXY_PORT);
 }
 
 main();
