@@ -10,4 +10,4 @@ FROM frolvlad/alpine-glibc:alpine-3.13
 WORKDIR /app
 COPY --from=0 /build/fp /app/fp
 COPY --from=0 /build/register /app/register
-ENTRYPOINT ["/app/register", "&&", "/app/fp"]
+ENTRYPOINT ["sh", "-c", "/app/register && /app/fp"]
