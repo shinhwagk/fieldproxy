@@ -1,22 +1,45 @@
 version: '3'
 
 services:
+  backend:
+    image: traefik/whoami
+    deploy:
+      replicas: 3
+  consul:
+    image: consul
+    ports:
+      - 8500:8500
   fieldproxy:
-    image: shinhwagk/fieldproxy
+    image: shinhwagk/fieldproxy:0.2.7-test2
     environment:
-      FP_FIELD:
-      FP_OUTTIME:
-      FP_LOG_LEVEL:
-      CONSUL_ADDR:
+      FP_FIELD: X-multidatabase-dbid
+      FP_OUTTIME: 60 
+      FP_LOG_LEVEL: DEBUG
+      CONSUL_ADDR: consul:8500
       # FP_PROXY_CONSUL_SERVICE:
-      FP_REGISTER_CONSUL_SERVICE:
+      FP_REGISTER_CONSUL_SERVICE: mdb-fieldproxy
   fieldproxy-watch:
     image: consul
     depends_on:
       - fieldproxy
     environment:
-      FP_REGISTER_CONSUL_SERVICE:
-      FP_PROXY_CONSUL_SERVICE:
+      FP_REGISTER_CONSUL_SERVICE: mdb-fieldproxy
+      FP_PROXY_CONSUL_SERVICE: backend
       CONSUL_HTTP_ADDR: consul:8500
-    command: consul watch -type=service -service=${FP_REGISTER_CONSUL_SERVICE} curl -s https://github.com/shinhwagk/fieldproxy/raw/${VERSION}/fp-handler.sh | sh -s
-
+    command: |
+      sh -c "
+        curl -O https://cdn.jsdelivr.net/gh/shinhwagk/fieldproxy/fp-handler.sh
+        chmod +x fp-handler.sh
+        consul watch -type=service -service=$${FP_PROXY_CONSUL_SERVICE} /fp-handler.sh
+      "
+  tool:
+    image: centos
+    depends_on:
+      - consul
+      - backend
+    command: |
+      curl -XPUT http://consul:8500/v1/agent/service/register -d '{"id":"f1", "name": "backend","address": "fieldproxy_backend_1","port": 80, "checks": [{ "http": `http://fieldproxy_backend_1`, interval: "10s" }]}'
+      curl -XPUT http://consul:8500/v1/agent/service/register -d '{"id":"f2", "name": "backend","address": "fieldproxy_backend_2","port": 80, "checks": [{ "http": `http://fieldproxy_backend_2`, interval: "10s" }]}'
+      sleep 5
+      curl --header "X-multidatabase-dbid:123" http://fieldproxy:8000/query -d '{ "db_id":"t11"}'
+      curl --header "X-multidatabase-dbid:123" http://fieldproxy:8000/query -d '{ "db_id":"t12"}'
