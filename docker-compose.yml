@@ -1,6 +1,10 @@
 version: '3'
 
 services:
+  consul:
+    image: consul
+    ports:
+      - 8500:8500
   fieldproxy:
     image: shinhwagk/fieldproxy
     environment:
