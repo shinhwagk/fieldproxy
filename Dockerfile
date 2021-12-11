@@ -1,8 +1,10 @@
 FROM denoland/deno
 ARG VERSION
 WORKDIR /build
-RUN deno compile -o /build/fp --allow-env --allow-net https://github.com/shinhwagk/fieldproxy/raw/${VERSION}/main.ts ${VERSION}
-RUN deno compile -o /build/register --allow-env --allow-net https://github.com/shinhwagk/fieldproxy/raw/${VERSION}/register.ts
+COPY main.ts .
+COPY register.ts .
+RUN deno compile -o /build/fp --allow-env --allow-net --unstable main.ts ${VERSION}
+RUN deno compile -o /build/register --allow-env --allow-net register.ts
 
 FROM frolvlad/alpine-glibc:alpine-3.13
 WORKDIR /app
