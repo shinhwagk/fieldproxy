@@ -3,8 +3,8 @@ ARG VERSION
 WORKDIR /build
 COPY main.ts .
 COPY register.ts .
-RUN deno compile -o /build/fp --allow-env --allow-net --unstable main.ts ${VERSION}
-RUN deno compile -o /build/register --allow-env --allow-net register.ts
+RUN deno compile -o /build/fp --allow-env --allow-net main.ts ${VERSION}
+RUN deno compile -o /build/register --allow-env --allow-net --unstable register.ts
 
 FROM frolvlad/alpine-glibc:alpine-3.13
 WORKDIR /app
