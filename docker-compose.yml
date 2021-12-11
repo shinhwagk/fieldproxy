@@ -4,13 +4,15 @@ services:
   backend:
     image: traefik/whoami
     deploy:
-      replicas: 3
+      replicas: 4
   consul:
     image: consul
     ports:
       - 8500:8500
   fieldproxy:
     image: shinhwagk/fieldproxy:0.2.7-test2
+    deploy:
+      replicas: 2
     environment:
       FP_FIELD: X-multidatabase-dbid
       FP_OUTTIME: 60 
@@ -18,28 +20,43 @@ services:
       CONSUL_ADDR: consul:8500
       # FP_PROXY_CONSUL_SERVICE:
       FP_REGISTER_CONSUL_SERVICE: mdb-fieldproxy
+  fieldproxy-ready2:
+    image: centos
+    restart: on-failure
+    volumes:
+      - fieldproxy:/opt
+    command: curl -s -o /opt/fp-handler.sh https://cdn.jsdelivr.net/gh/shinhwagk/fieldproxy/fp-handler.sh
+  fieldproxy-ready1:
+    image: centos
+    restart: on-failure
+    depends_on:
+      - fieldproxy-ready2
+    volumes:
+      - fieldproxy:/opt
+    command: chmod +x /opt/fp-handler.sh
   fieldproxy-watch:
     image: consul
+    restart: on-failure
+    volumes:
+      - fieldproxy:/opt
     depends_on:
       - fieldproxy
+      - fieldproxy-ready2
+      - fieldproxy-ready1
     environment:
       FP_REGISTER_CONSUL_SERVICE: mdb-fieldproxy
       FP_PROXY_CONSUL_SERVICE: backend
       CONSUL_HTTP_ADDR: consul:8500
-    command: |
-      sh -c "
-        curl -O https://cdn.jsdelivr.net/gh/shinhwagk/fieldproxy/fp-handler.sh
-        chmod +x fp-handler.sh
-        consul watch -type=service -service=$${FP_PROXY_CONSUL_SERVICE} /fp-handler.sh
-      "
+    command: "watch -type=service -service=$${FP_PROXY_CONSUL_SERVICE} /opt/fp-handler.sh"
   tool:
     image: centos
+    restart: on-failure
     depends_on:
       - consul
       - backend
-    command: |
-      curl -XPUT http://consul:8500/v1/agent/service/register -d '{"id":"f1", "name": "backend","address": "fieldproxy_backend_1","port": 80, "checks": [{ "http": `http://fieldproxy_backend_1`, interval: "10s" }]}'
-      curl -XPUT http://consul:8500/v1/agent/service/register -d '{"id":"f2", "name": "backend","address": "fieldproxy_backend_2","port": 80, "checks": [{ "http": `http://fieldproxy_backend_2`, interval: "10s" }]}'
-      sleep 5
-      curl --header "X-multidatabase-dbid:123" http://fieldproxy:8000/query -d '{ "db_id":"t11"}'
-      curl --header "X-multidatabase-dbid:123" http://fieldproxy:8000/query -d '{ "db_id":"t12"}'
+      - fieldproxy
+    volumes:
+      - ./test/test.sh:/tmp/test.sh
+    command: bash /tmp/test.sh
+volumes:
+  fieldproxy:
