@@ -1,26 +1,62 @@
 version: '3'
 
 services:
+  backend:
+    image: traefik/whoami
+    deploy:
+      replicas: 4
   consul:
     image: consul
     ports:
       - 8500:8500
   fieldproxy:
-    image: shinhwagk/fieldproxy
+    image: shinhwagk/fieldproxy:0.2.7-test2
+    deploy:
+      replicas: 2
     environment:
-      FP_FIELD:
-      FP_OUTTIME:
-      FP_LOG_LEVEL:
-      CONSUL_ADDR:
+      FP_FIELD: X-multidatabase-dbid
+      FP_OUTTIME: 60 
+      FP_LOG_LEVEL: DEBUG
+      CONSUL_ADDR: consul:8500
       # FP_PROXY_CONSUL_SERVICE:
-      FP_REGISTER_CONSUL_SERVICE:
+      FP_REGISTER_CONSUL_SERVICE: mdb-fieldproxy
+  fieldproxy-ready2:
+    image: centos
+    restart: on-failure
+    volumes:
+      - fieldproxy:/opt
+    command: curl -s -o /opt/fp-handler.sh https://cdn.jsdelivr.net/gh/shinhwagk/fieldproxy/fp-handler.sh
+  fieldproxy-ready1:
+    image: centos
+    restart: on-failure
+    depends_on:
+      - fieldproxy-ready2
+    volumes:
+      - fieldproxy:/opt
+    command: chmod +x /opt/fp-handler.sh
   fieldproxy-watch:
     image: consul
+    restart: on-failure
+    volumes:
+      - fieldproxy:/opt
     depends_on:
       - fieldproxy
+      - fieldproxy-ready2
+      - fieldproxy-ready1
     environment:
-      FP_REGISTER_CONSUL_SERVICE:
-      FP_PROXY_CONSUL_SERVICE:
+      FP_REGISTER_CONSUL_SERVICE: mdb-fieldproxy
+      FP_PROXY_CONSUL_SERVICE: backend
       CONSUL_HTTP_ADDR: consul:8500
-    command: consul watch -type=service -service=${FP_REGISTER_CONSUL_SERVICE} curl -s https://github.com/shinhwagk/fieldproxy/raw/${VERSION}/fp-handler.sh | sh -s
-
+    command: "watch -type=service -service=$${FP_PROXY_CONSUL_SERVICE} /opt/fp-handler.sh"
+  tool:
+    image: centos
+    restart: on-failure
+    depends_on:
+      - consul
+      - backend
+      - fieldproxy
+    volumes:
+      - ./test/test.sh:/tmp/test.sh
+    command: bash /tmp/test.sh
+volumes:
+  fieldproxy:

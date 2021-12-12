@@ -1,4 +1,0 @@
-[
-  { "server": "fieldproxy_devcontainer_server_2", "port": 80 },
-  { "server": "fieldproxy_devcontainer_server_1", "port": 80 }
-]
