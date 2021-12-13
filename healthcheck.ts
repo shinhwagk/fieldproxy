@@ -3,6 +3,6 @@ try {
     if (res.status !== 200) {
         Deno.exit(1)
     }
-} catch (e) {
+} catch (_e) {
     Deno.exit(1)
 }
