@@ -3,6 +3,7 @@ ARG VERSION
 WORKDIR /build
 COPY main.ts .
 COPY register.ts .
+COPY healthcheck.ts .
 RUN deno compile -o /build/fp --allow-env --allow-net main.ts ${VERSION}
 RUN deno compile -o /build/register --allow-env --allow-net --unstable register.ts
 RUN deno compile -o /build/healthcheck --allow-net healthcheck.ts
