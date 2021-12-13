@@ -1,6 +1,8 @@
 FROM denoland/deno
-RUN mkdir -p /build
-RUN deno compile -o /build/fp --allow-env --allow-net main.ts
+ARG VERSION
+WORKDIR /build
+COPY main.ts .
+RUN deno compile -o /build/fp --allow-env --allow-net main.ts ${VERSION}
 
 FROM denoland/deno:alpine-1.16.4
 WORKDIR /app
