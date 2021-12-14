@@ -41,7 +41,7 @@ class FieldBalancer {
     let pob = this.filedForNumberOfServices
     if (this.filedForNumberOfServices > this.numberOfServices) {
       pob = this.numberOfServices
-      logger.warning(`field for number of services:${this.filedForNumberOfServices} > number of services:${this.numberOfServices}`)
+      logger.warning(`field for number of services: ${this.filedForNumberOfServices} more than number of services: ${this.numberOfServices}`)
     }
 
     const digest: ArrayBuffer = await crypto.subtle.digest(
@@ -130,13 +130,10 @@ class FieldProxy {
         const httpConn = Deno.serveHttp(conn);
         for await (const requestEvent of httpConn) {
           try {
-            this.reqPallCnt += 1
             const res = await this.handle(requestEvent.request)
             await requestEvent.respondWith(res)
           } catch (e) {
             logger.error(`http request error: ${e}`)
-          } finally {
-            this.reqPallCnt -= 1
           }
         }
       })();
