@@ -1,3 +1,4 @@
+import { crypto } from "https://deno.land/std@0.117.0/crypto/mod.ts";
 import * as log from "https://deno.land/std@0.117.0/log/mod.ts";
 
 const VERSION = Deno.args[0]
@@ -20,78 +21,35 @@ await log.setup({
 
 const logger: log.Logger = log.getLogger();
 
-type FieldContainer = {
-  [server: string]: { [fieldVal: string]: number }; // type LastUsedTime = number;
-};
-
 class FieldBalancer {
   private services: string[] = []
-  private readonly container: FieldContainer = {};
+  private numberOfServices = 0
 
-  constructor(private readonly outime: number) { }
+  constructor(private readonly filedForNumberOfServices: number) { }
 
   public setServices(services: string[]) {
     this.services = services
+    this.numberOfServices = services.length
   }
 
-  private cleanOuttimeField() {
-    for (const i of Object.keys(this.container)) {
-      for (const [field, ltime] of Object.entries(this.container[i])) {
-        if ((new Date()).getTime() - ltime > 1000 * this.outime) {
-          delete this.container[i][field];
-        }
-      }
-    }
+  public async selectService(field: string): Promise<string | undefined> {
+    const idx = await this.serviceIndexSelector(field,)
+    return this.services[idx]
   }
 
-  private getContainerFieldsAverage(): number {
-    const cLen = Object.keys(this.container).length;
-    const avg = cLen === 0
-      ? 0
-      : Object.values(this.container)
-        .map((s) => Object.keys(s).length)
-        .reduce((a, b) => a + b, 0,)
-      / cLen;
-    return Math.floor(avg);
-  }
-
-  public refreshContainer() {
-    for (const s of Object.keys(this.container)) {
-      if (!this.services.includes(s)) {
-        delete this.container[s];
-      }
-    }
-    for (const s of this.services) {
-      if (!Object.keys(this.container).includes(s)) {
-        this.container[s] = {};
-      }
+  private async serviceIndexSelector(val: string) {
+    let pob = this.filedForNumberOfServices
+    if (this.filedForNumberOfServices > this.numberOfServices) {
+      pob = this.numberOfServices
+      logger.warning(`field for number of services:${this.filedForNumberOfServices} > number of services:${this.numberOfServices}`)
     }
 
-    this.cleanOuttimeField()
-  }
-
-  public getServiceAddr(field: string): string | null {
-    // is exist
-    for (const i of Object.keys(this.container)) {
-      if (Object.keys(this.container[i]).includes(field)) {
-        this.container[i][field] = (new Date()).getTime();
-        return i;
-      }
-    }
-    // if not exist
-    for (const i of Object.keys(this.container)) {
-      if (
-        Object.keys(this.container[i]).length <=
-        this.getContainerFieldsAverage()
-      ) {
-        this.container[i][field] = (new Date()).getTime();
-        return i;
-      }
-    }
-
-    return Object.keys(this.container).length >= 1
-      ? Object.keys(this.container)[0]
-      : null;
+    const digest: ArrayBuffer = await crypto.subtle.digest(
+      "SHA-1",
+      new TextEncoder().encode(val),
+    );
+    return (new Uint8Array(digest)
+      .reduce((a, b) => a + b, 0) + Math.ceil(Math.random() * pob)) % this.numberOfServices
   }
 }
 
@@ -125,7 +83,7 @@ class FieldProxy {
     request.headers.forEach((v, k) => logger.debug(k, v));
     logger.debug(`header: ${this.field}:${fieldVal}`);
     if (fieldVal) {
-      const proxyServer = this.fb.getServiceAddr(fieldVal);
+      const proxyServer = await this.fb.selectService(fieldVal);
       if (proxyServer) {
         try {
           logger.info(`field: ${this.field}:${fieldVal} -> ${proxyServer}`);
@@ -135,13 +93,16 @@ class FieldProxy {
           logger.debug(`field: ${fieldVal} -> ${proxyServer}, time: ${_endTime - _startTime}`,);
           return res
         } catch (e) {
+          logger.error(`${this.field} -> ${fieldVal}, ${e.message}`)
           return new Response(e.message, { status: 502 });
         }
       } else {
+        logger.error(`no servers under services.`)
         return new Response(`no servers under services.`, { status: 502 });
       }
     } else {
-      return new Response(`field: ${fieldVal} not specified.`, { status: 502, });
+      logger.error(`field:${this.field} not specified.`)
+      return new Response(`field:${this.field} not specified.`, { status: 502, });
     }
   }
 
@@ -152,7 +113,6 @@ class FieldProxy {
     } else if (request.method === 'PUT' && url.pathname === "/services") {
       const services = await request.json()
       this.fb.setServices(services);
-      this.fb.refreshContainer()
       // logger.debug(`list service [${consulService}]:`)
       for (const s of services) {
         logger.info(`  - ${s}`)
@@ -185,19 +145,10 @@ class FieldProxy {
 }
 
 function main() {
-  const PROXY_PORT = 8000
-  const FP_FIELD = Deno.env.get("FP_FIELD") || 'x-proxyfield';
-  const FP_OUTTIME = Deno.env.get("FP_OUTTIME") || '60'; // second
-  // const FP_LOG_LEVEL = (Deno.env.get("FP_LOG_LEVEL") || 'INFO') as log.LevelName;
-
-  const fieldBalancer = new FieldBalancer(Number(FP_OUTTIME));
-
-  const fn = () => {
-    fieldBalancer.refreshContainer();
-  };
-
-  setInterval(fn, 1000);
-
+  const PROXY_PORT = 8000;
+  const FP_FIELD = Deno.env.get("FP_FIELD") || 'x-field';
+  const FP_FIELD_FOR_NUMBER_OF_SERVICES = Deno.env.get("FP_FIELD_FOR_NUMBER_OF_SERVICES") || '1';
+  const fieldBalancer = new FieldBalancer(Number(FP_FIELD_FOR_NUMBER_OF_SERVICES));
   (new FieldProxy(FP_FIELD, fieldBalancer))
     .start(PROXY_PORT);
 }
